@@ -72,30 +72,34 @@ async function fetchTimeSeries(symbol: string): Promise<ChartPoint[] | null> {
   }
 }
 
-function lastTradingDayChange(
+/** Son iki iş gününün kapanış fiyatları (her günün son noktası = kapanış). Hafta sonu: Cuma–Perşembe; hafta içi: son gün – bir önceki iş günü. */
+function lastTwoTradingDayCloses(series: ChartPoint[]): { lastClose: number; prevClose: number } | null {
+  if (series.length === 0) return null;
+
+  const byDate = new Map<string, number>();
+  for (const p of series) {
+    const date = p.time.split(" ")[0];
+    byDate.set(date, p.price);
+  }
+  const dates = Array.from(byDate.keys()).sort();
+  if (dates.length < 2) return null;
+
+  const lastClose = byDate.get(dates[dates.length - 1])!;
+  const prevClose = byDate.get(dates[dates.length - 2])!;
+  return { lastClose, prevClose };
+}
+
+function changeFromLastTwoTradingDays(
   series: ChartPoint[],
   decimals: number
 ): { change: number; changePercent: number } | null {
-  if (series.length < 24) return null;
-
-  const lastPrice = series[series.length - 1].price;
-  const lastDate = series[series.length - 1].time.split(" ")[0];
-
-  let prevClose: number | null = null;
-  for (let i = series.length - 2; i >= 0; i--) {
-    const date = series[i].time.split(" ")[0];
-    if (date !== lastDate) {
-      prevClose = series[i].price;
-      break;
-    }
-  }
-
-  if (prevClose === null || prevClose === 0) return null;
+  const closes = lastTwoTradingDayCloses(series);
+  if (!closes || closes.prevClose === 0) return null;
 
   const factor = Math.pow(10, decimals);
-  const change = Math.round((lastPrice - prevClose) * factor) / factor;
+  const change = Math.round((closes.lastClose - closes.prevClose) * factor) / factor;
   const changePercent =
-    Math.round(((lastPrice - prevClose) / prevClose) * 10000) / 100;
+    Math.round(((closes.lastClose - closes.prevClose) / closes.prevClose) * 10000) / 100;
 
   return { change, changePercent };
 }
@@ -200,22 +204,21 @@ export async function GET() {
     const usd = buildSymbol("USD/TRY", usdQuote, usdSeries);
     const eur = buildSymbol("EUR/TRY", eurQuote, eurSeries);
 
-    const day = new Date().getDay();
-    const isWeekend = day === 0 || day === 6;
-
-    if (isWeekend) {
-      if (usd.change === 0) {
-        const fb = lastTradingDayChange(usdSeries, 4);
-        if (fb) { usd.change = fb.change; usd.changePercent = fb.changePercent; }
-      }
-      if (eur.change === 0) {
-        const fb = lastTradingDayChange(eurSeries, 4);
-        if (fb) { eur.change = fb.change; eur.changePercent = fb.changePercent; }
-      }
-      if (gold.change === 0) {
-        const fb = lastTradingDayChange(gold.timeSeries, 2);
-        if (fb) { gold.change = fb.change; gold.changePercent = fb.changePercent; }
-      }
+    // Fark her zaman son iki iş günü kapanışından: hafta sonu Cuma–Perşembe, hafta içi son iş günü – bir önceki
+    const usdFark = changeFromLastTwoTradingDays(usdSeries, 4);
+    if (usdFark) {
+      usd.change = usdFark.change;
+      usd.changePercent = usdFark.changePercent;
+    }
+    const eurFark = changeFromLastTwoTradingDays(eurSeries, 4);
+    if (eurFark) {
+      eur.change = eurFark.change;
+      eur.changePercent = eurFark.changePercent;
+    }
+    const goldFark = changeFromLastTwoTradingDays(gold.timeSeries, 2);
+    if (goldFark) {
+      gold.change = goldFark.change;
+      gold.changePercent = goldFark.changePercent;
     }
 
     const data: MarketData = { gold, usd, eur, timestamp: Date.now() };

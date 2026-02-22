@@ -66,6 +66,38 @@ function portfolioToRow(p: Portfolio, userId: string) {
   };
 }
 
+function portfolioToUpdateRow(p: Portfolio) {
+  return {
+    gold_physical: p.gold.physical,
+    gold_digital: p.gold.digital,
+    usd_physical: p.usd.physical,
+    usd_digital: p.usd.digital,
+    eur_physical: p.eur.physical,
+    eur_digital: p.eur.digital,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function savePortfolioToSupabase(supabase: ReturnType<typeof getSupabase>, userId: string, p: Portfolio) {
+  if (!supabase) return;
+  const { data: existing } = await supabase
+    .from("portfolios")
+    .select("user_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existing) {
+    await supabase
+      .from("portfolios")
+      .update(portfolioToUpdateRow(p))
+      .eq("user_id", userId);
+  } else {
+    await supabase
+      .from("portfolios")
+      .insert(portfolioToRow(p, userId));
+  }
+}
+
 export function usePortfolio(user: User | null) {
   const [portfolio, setPortfolio] = useState<Portfolio>(loadLocal);
   const userRef = useRef<User | null>(null);
@@ -81,6 +113,7 @@ export function usePortfolio(user: User | null) {
     userRef.current = user;
 
     const supabase = getSupabase();
+    if (!supabase) return;
 
     (async () => {
       const { data } = await supabase
@@ -96,9 +129,7 @@ export function usePortfolio(user: User | null) {
       } else {
         const local = loadLocal();
         if (!isEmpty(local)) {
-          await supabase
-            .from("portfolios")
-            .upsert(portfolioToRow(local, user.id));
+          await savePortfolioToSupabase(supabase, user.id, local);
           setPortfolio(local);
         }
       }
@@ -107,22 +138,27 @@ export function usePortfolio(user: User | null) {
 
   const updateAsset = useCallback(
     async (key: AssetKey, holding: AssetHolding) => {
-      setPortfolio((prev) => {
-        const next = { ...prev, [key]: holding };
-        saveLocal(next);
+      const next = { ...portfolio, [key]: holding };
+      setPortfolio(next);
+      saveLocal(next);
 
-        if (userRef.current) {
-          const supabase = getSupabase();
-          supabase
-            .from("portfolios")
-            .upsert(portfolioToRow(next, userRef.current.id));
-        }
-
-        return next;
-      });
+      if (userRef.current) {
+        const supabase = getSupabase();
+        await savePortfolioToSupabase(supabase, userRef.current.id, next);
+      }
     },
-    []
+    [portfolio]
   );
 
-  return { portfolio, updateAsset };
+  const resetPortfolio = useCallback(async () => {
+    setPortfolio(DEFAULT);
+    saveLocal(DEFAULT);
+
+    if (userRef.current) {
+      const supabase = getSupabase();
+      await savePortfolioToSupabase(supabase, userRef.current.id, DEFAULT);
+    }
+  }, []);
+
+  return { portfolio, updateAsset, resetPortfolio };
 }

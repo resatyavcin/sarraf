@@ -17,6 +17,10 @@ export const metadata: Metadata = {
   title: "Sarraf",
   description: "Altın, Dolar ve Euro kurlarını canlı takip edin",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/icon-192.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -39,6 +43,7 @@ export default function RootLayout({
   return (
     <html lang="tr">
       <head>
+        <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
       <body

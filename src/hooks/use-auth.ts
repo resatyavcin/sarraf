@@ -10,6 +10,10 @@ export function useAuth() {
 
   useEffect(() => {
     const supabase = getSupabase();
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -27,17 +31,18 @@ export function useAuth() {
 
   const signInWithGoogle = useCallback(async () => {
     const supabase = getSupabase();
+    if (!supabase) return;
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${typeof window !== "undefined" ? window.location.origin : ""}/auth/callback`,
       },
     });
   }, []);
 
   const signOut = useCallback(async () => {
     const supabase = getSupabase();
-    await supabase.auth.signOut();
+    if (supabase) await supabase.auth.signOut();
     setUser(null);
   }, []);
 

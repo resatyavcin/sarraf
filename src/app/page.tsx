@@ -8,7 +8,17 @@ import { PriceCard, GoldCard } from "@/components/price-card";
 import { AssetDrawer } from "@/components/asset-drawer";
 import { PriceChart } from "@/components/price-chart";
 import { Separator } from "@/components/ui/separator";
-import { Wifi, WifiOff, Clock, Wallet, Coins, LogOut } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Wifi, WifiOff, Clock, Wallet, LogOut } from "lucide-react";
 import { AssetKey } from "@/lib/types";
 
 const drawerConfig: Record<AssetKey, { title: string; unit: string; step: number }> = {
@@ -20,8 +30,9 @@ const drawerConfig: Record<AssetKey, { title: string; unit: string; step: number
 export default function Home() {
   const { data, loading, error, lastFetch, refetch } = useMarketData();
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
-  const { portfolio, updateAsset } = usePortfolio(user);
+  const { portfolio, updateAsset, resetPortfolio } = usePortfolio(user);
   const [activeDrawer, setActiveDrawer] = useState<AssetKey | null>(null);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
   const CURRENCY_SPREAD = 0.008;
 
@@ -40,14 +51,51 @@ export default function Home() {
 
   const drawerKey = activeDrawer ?? "gold";
 
+  if (!authLoading && !user) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
+        <img
+          src="/icons/icon-192.png"
+          alt="Sarraf"
+          className="h-12 w-12 rounded-xl"
+          width={48}
+          height={48}
+        />
+        <h1 className="mt-4 text-xl font-bold tracking-tight">Sarraf</h1>
+        <p className="mt-2 text-center text-sm text-muted-foreground">
+          Varlıklarınızı görmek için giriş yapın
+        </p>
+        <button
+          onClick={signInWithGoogle}
+          className="mt-8 flex items-center gap-2 rounded-xl bg-foreground px-6 py-3 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
+        >
+          <GoogleIcon />
+          Google ile Giriş Yap
+        </button>
+      </div>
+    );
+  }
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-pulse rounded-lg bg-muted" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground">
-              <Coins className="h-5 w-5 text-background" />
-            </div>
+            <img
+              src="/icons/icon-192.png"
+              alt="Sarraf"
+              className="h-8 w-8 rounded-lg"
+              width={32}
+              height={32}
+            />
             <h1 className="text-lg font-bold tracking-tight">Sarraf</h1>
           </div>
           <div className="flex items-center gap-3">
@@ -67,52 +115,47 @@ export default function Home() {
                 <Wifi className="h-3.5 w-3.5 text-emerald-500" />
               )}
             </div>
-            {!authLoading && (
-              user ? (
-                <div className="flex items-center gap-2">
-                  {user.user_metadata?.avatar_url && (
-                    <img
-                      src={user.user_metadata.avatar_url}
-                      alt=""
-                      className="h-7 w-7 rounded-full"
-                      referrerPolicy="no-referrer"
-                    />
-                  )}
-                  <button
-                    onClick={signOut}
-                    className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    title="Çıkış Yap"
-                  >
-                    <LogOut className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={signInWithGoogle}
-                  className="flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-colors hover:bg-foreground/90"
-                >
-                  <GoogleIcon />
-                  Giriş Yap
-                </button>
-              )
-            )}
+            <div className="flex items-center gap-2">
+              {user?.user_metadata?.avatar_url && (
+                <img
+                  src={user.user_metadata.avatar_url}
+                  alt=""
+                  className="h-7 w-7 rounded-full"
+                  referrerPolicy="no-referrer"
+                />
+              )}
+              <button
+                onClick={signOut}
+                className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                title="Çıkış Yap"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
-        {totalTL > 0 && (
-          <div className="border-t border-b bg-muted/30">
-            <div className="mx-auto flex max-w-4xl items-center gap-2 px-4 py-2">
+        <div className="border-t border-b bg-muted/30">
+          <div className="mx-auto flex max-w-4xl items-center justify-between gap-2 px-4 py-2">
+            <div className="flex items-center gap-2">
               <Wallet className="h-4 w-4 text-foreground" />
               <span className="text-sm font-semibold tabular-nums">
-                {totalTL.toLocaleString("tr-TR", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}{" "}
-                ₺
+                {totalTL > 0
+                  ? `${totalTL.toLocaleString("tr-TR", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })} ₺`
+                  : "0,00 ₺"}
               </span>
               <span className="text-xs text-muted-foreground">toplam varlık</span>
             </div>
+            <button
+              onClick={() => setResetDialogOpen(true)}
+              className="text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"
+            >
+              Varlıklarımı Sıfırla
+            </button>
           </div>
-        )}
+        </div>
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-6">
@@ -189,6 +232,28 @@ export default function Home() {
           if (activeDrawer) updateAsset(activeDrawer, h);
         }}
       />
+
+      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Varlıklarımı Sıfırla</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tüm varlıklar sıfırlansın mı? Bu işlem geri alınamaz.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                resetPortfolio();
+                setResetDialogOpen(false);
+              }}
+            >
+              Sıfırla
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
