@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Portfolio, AssetHolding, AssetKey } from "@/lib/types";
-import { getSupabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 
 const STORAGE_KEY = "altinim-portfolio";
@@ -45,59 +44,6 @@ function isEmpty(p: Portfolio) {
   );
 }
 
-function rowToPortfolio(row: Record<string, number>): Portfolio {
-  return {
-    gold: { physical: Number(row.gold_physical) || 0, digital: Number(row.gold_digital) || 0 },
-    usd: { physical: Number(row.usd_physical) || 0, digital: Number(row.usd_digital) || 0 },
-    eur: { physical: Number(row.eur_physical) || 0, digital: Number(row.eur_digital) || 0 },
-  };
-}
-
-function portfolioToRow(p: Portfolio, userId: string) {
-  return {
-    user_id: userId,
-    gold_physical: p.gold.physical,
-    gold_digital: p.gold.digital,
-    usd_physical: p.usd.physical,
-    usd_digital: p.usd.digital,
-    eur_physical: p.eur.physical,
-    eur_digital: p.eur.digital,
-    updated_at: new Date().toISOString(),
-  };
-}
-
-function portfolioToUpdateRow(p: Portfolio) {
-  return {
-    gold_physical: p.gold.physical,
-    gold_digital: p.gold.digital,
-    usd_physical: p.usd.physical,
-    usd_digital: p.usd.digital,
-    eur_physical: p.eur.physical,
-    eur_digital: p.eur.digital,
-    updated_at: new Date().toISOString(),
-  };
-}
-
-async function savePortfolioToSupabase(supabase: ReturnType<typeof getSupabase>, userId: string, p: Portfolio) {
-  if (!supabase) return;
-  const { data: existing } = await supabase
-    .from("portfolios")
-    .select("user_id")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (existing) {
-    await supabase
-      .from("portfolios")
-      .update(portfolioToUpdateRow(p))
-      .eq("user_id", userId);
-  } else {
-    await supabase
-      .from("portfolios")
-      .insert(portfolioToRow(p, userId));
-  }
-}
-
 export function usePortfolio(user: User | null) {
   const [portfolio, setPortfolio] = useState<Portfolio>(loadLocal);
   const userRef = useRef<User | null>(null);
@@ -112,25 +58,25 @@ export function usePortfolio(user: User | null) {
     if (userRef.current?.id === user.id) return;
     userRef.current = user;
 
-    const supabase = getSupabase();
-    if (!supabase) return;
-
     (async () => {
-      const { data } = await supabase
-        .from("portfolios")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
-
-      if (data) {
-        const cloud = rowToPortfolio(data);
-        setPortfolio(cloud);
-        saveLocal(cloud);
-      } else {
+      try {
+        const res = await fetch("/api/portfolio");
+        const data = await res.json();
+        setPortfolio(data);
+        saveLocal(data);
+      } catch {
         const local = loadLocal();
+        setPortfolio(local);
         if (!isEmpty(local)) {
-          await savePortfolioToSupabase(supabase, user.id, local);
-          setPortfolio(local);
+          try {
+            await fetch("/api/portfolio", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(local),
+            });
+          } catch {
+            /* ignore */
+          }
         }
       }
     })();
@@ -143,8 +89,15 @@ export function usePortfolio(user: User | null) {
       saveLocal(next);
 
       if (userRef.current) {
-        const supabase = getSupabase();
-        await savePortfolioToSupabase(supabase, userRef.current.id, next);
+        try {
+          await fetch("/api/portfolio", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(next),
+          });
+        } catch {
+          /* ignore */
+        }
       }
     },
     [portfolio]
@@ -155,8 +108,15 @@ export function usePortfolio(user: User | null) {
     saveLocal(DEFAULT);
 
     if (userRef.current) {
-      const supabase = getSupabase();
-      await savePortfolioToSupabase(supabase, userRef.current.id, DEFAULT);
+      try {
+        await fetch("/api/portfolio", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(DEFAULT),
+        });
+      } catch {
+        /* ignore */
+      }
     }
   }, []);
 
