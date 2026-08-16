@@ -9,7 +9,7 @@ export function useAuth() {
 
   const fetchSession = useCallback(async () => {
     try {
-      const res = await fetch("/api/auth/session");
+      const res = await fetch("/api/auth/session", { cache: "no-store" });
       const { user: u } = await res.json();
       setUser(u ?? null);
     } catch {

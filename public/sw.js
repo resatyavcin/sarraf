@@ -1,5 +1,5 @@
-const CACHE_NAME = "sarraf-v1";
-const API_CACHE_NAME = "sarraf-api-v1";
+const CACHE_NAME = "sarraf-v2";
+const API_CACHE_NAME = "sarraf-api-v2";
 
 const STATIC_ASSETS = ["/", "/manifest.json"];
 
@@ -25,6 +25,21 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
+
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  // Auth and user data must never be served stale.
+  if (
+    url.pathname.startsWith("/api/auth") ||
+    url.pathname.startsWith("/auth/") ||
+    url.pathname.startsWith("/api/portfolio") ||
+    url.pathname.startsWith("/api/savings") ||
+    url.pathname.startsWith("/api/viewers")
+  ) {
+    return;
+  }
 
   if (url.pathname.startsWith("/api/market")) {
     event.respondWith(networkFirstStrategy(event.request));

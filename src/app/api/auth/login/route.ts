@@ -1,16 +1,22 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createServerSupabase, hasSupabaseConfig } from "@/lib/supabase-server";
+import {
+  createServerSupabase,
+  hasSupabaseConfig,
+  redirectWithCookies,
+  type CookieToSet,
+} from "@/lib/supabase-server";
 
 export async function GET(request: Request) {
+  const origin = new URL(request.url).origin;
+
   if (!hasSupabaseConfig()) {
-    const origin = new URL(request.url).origin;
     return NextResponse.redirect(`${origin}?error=config`);
   }
 
-  const origin = new URL(request.url).origin;
   const cookieStore = await cookies();
-  const supabase = createServerSupabase(cookieStore);
+  const pending: CookieToSet[] = [];
+  const supabase = createServerSupabase(cookieStore, (c) => pending.push(...c));
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
@@ -21,5 +27,5 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}?error=auth`);
   }
 
-  return NextResponse.redirect(data.url);
+  return redirectWithCookies(data.url, pending);
 }

@@ -9,7 +9,10 @@ export async function GET() {
 
   const cookieStore = await cookies();
   const supabase = createServerSupabase(cookieStore);
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  return NextResponse.json({ user: session?.user ?? null });
+  return NextResponse.json(
+    { user: user ?? null },
+    { headers: { "Cache-Control": "private, no-store" } }
+  );
 }

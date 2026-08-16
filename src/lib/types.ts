@@ -1,11 +1,3 @@
-export interface TimeSeriesValue {
-  datetime: string;
-  open: string;
-  high: string;
-  low: string;
-  close: string;
-}
-
 export interface ChartPoint {
   time: string;
   price: number;
@@ -14,12 +6,6 @@ export interface ChartPoint {
 export interface SymbolData {
   symbol: string;
   price: number;
-  change: number;
-  changePercent: number;
-  high: number;
-  low: number;
-  timeSeries: ChartPoint[];
-  lastUpdated: string;
 }
 
 export interface GoldData extends SymbolData {
@@ -53,3 +39,15 @@ export interface Portfolio {
 }
 
 export type AssetKey = keyof Portfolio;
+
+export type AccountRole = "owner" | "viewer";
+
+export interface SavingEntry {
+  month: string; // "YYYY-MM"
+  amount: number;
+}
+
+export interface ViewerEntry {
+  email: string;
+  createdAt: string;
+}

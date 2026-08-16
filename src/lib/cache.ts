@@ -1,7 +1,7 @@
 import { CachedMarketData, MarketData } from "./types";
 
 const CACHE_KEY = "altinim-market-data";
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 const CACHE_DURATION = 10 * 60 * 1000;
 
 interface VersionedCache extends CachedMarketData {

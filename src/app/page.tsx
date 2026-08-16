@@ -1,24 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useMarketData } from "@/hooks/use-market-data";
 import { useAuth } from "@/hooks/use-auth";
 import { usePortfolio } from "@/hooks/use-portfolio";
 import { PriceCard, GoldCard } from "@/components/price-card";
 import { AssetDrawer } from "@/components/asset-drawer";
-import { PriceChart } from "@/components/price-chart";
-import { Separator } from "@/components/ui/separator";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Wifi, WifiOff, Clock, Wallet, LogOut } from "lucide-react";
+import { SavingsSection } from "@/components/savings-section";
+import { ViewersPanel } from "@/components/viewers-panel";
+import { Wifi, WifiOff, Clock, Wallet, LogOut, UserPlus, Eye } from "lucide-react";
 import { AssetKey } from "@/lib/types";
 
 const drawerConfig: Record<AssetKey, { title: string; unit: string; step: number }> = {
@@ -30,9 +20,9 @@ const drawerConfig: Record<AssetKey, { title: string; unit: string; step: number
 export default function Home() {
   const { data, loading, error, lastFetch, refetch } = useMarketData();
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
-  const { portfolio, updateAsset, resetPortfolio } = usePortfolio(user);
+  const { portfolio, updateAsset, isViewer } = usePortfolio(user);
   const [activeDrawer, setActiveDrawer] = useState<AssetKey | null>(null);
-  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [viewersOpen, setViewersOpen] = useState(false);
 
   const CURRENCY_SPREAD = 0.008;
 
@@ -50,6 +40,15 @@ export default function Home() {
   }, [data, portfolio]);
 
   const drawerKey = activeDrawer ?? "gold";
+
+  // Supabase bazen code'u / yerine /auth/callback'e gönderir; /?code= gelirse callback'e yönlendir
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("code") && window.location.pathname === "/") {
+      window.location.replace(`/auth/callback?${params.toString()}`);
+    }
+  }, []);
 
   if (!authLoading && !user) {
     return (
@@ -116,6 +115,15 @@ export default function Home() {
               )}
             </div>
             <div className="flex items-center gap-2">
+              {!isViewer && (
+                <button
+                  onClick={() => setViewersOpen(true)}
+                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  title="Görüntüleyici ekle"
+                >
+                  <UserPlus className="h-4 w-4" />
+                </button>
+              )}
               {user?.user_metadata?.avatar_url && (
                 <img
                   src={user.user_metadata.avatar_url}
@@ -135,27 +143,27 @@ export default function Home() {
           </div>
         </div>
         <div className="border-t border-b bg-muted/30">
-          <div className="mx-auto flex max-w-4xl items-center justify-between gap-2 px-4 py-2">
-            <div className="flex items-center gap-2">
-              <Wallet className="h-4 w-4 text-foreground" />
-              <span className="text-sm font-semibold tabular-nums">
-                {totalTL > 0
-                  ? `${totalTL.toLocaleString("tr-TR", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })} ₺`
-                  : "0,00 ₺"}
-              </span>
-              <span className="text-xs text-muted-foreground">toplam varlık</span>
-            </div>
-            <button
-              onClick={() => setResetDialogOpen(true)}
-              className="text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"
-            >
-              Varlıklarımı Sıfırla
-            </button>
+          <div className="mx-auto flex max-w-4xl items-center gap-2 px-4 py-2">
+            <Wallet className="h-4 w-4 text-foreground" />
+            <span className="text-sm font-semibold tabular-nums">
+              {totalTL > 0
+                ? `${totalTL.toLocaleString("tr-TR", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })} ₺`
+                : "0,00 ₺"}
+            </span>
+            <span className="text-xs text-muted-foreground">toplam varlık</span>
           </div>
         </div>
+        {isViewer && (
+          <div className="border-b bg-amber-500/10">
+            <div className="mx-auto flex max-w-4xl items-center gap-2 px-4 py-2 text-xs text-amber-800 dark:text-amber-200">
+              <Eye className="h-3.5 w-3.5 shrink-0" />
+              <span>Salt okunur — paylaşılan hesabı görüntülüyorsunuz</span>
+            </div>
+          </div>
+        )}
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-6">
@@ -165,14 +173,14 @@ export default function Home() {
           <ErrorState message={error} onRetry={refetch} />
         ) : data ? (
           <div className="space-y-6">
+            <SavingsSection user={user} />
+
             <GoldCard
               title="Gram Altın"
               gramBuy={data.gold.gramBuy}
               gramSell={data.gold.gramSell}
-              change={data.gold.change}
-              changePercent={data.gold.changePercent}
               holding={portfolio.gold}
-              onEdit={() => setActiveDrawer("gold")}
+              onEdit={isViewer ? undefined : () => setActiveDrawer("gold")}
             />
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -181,34 +189,14 @@ export default function Home() {
                 symbol={data.usd}
                 variant="dollar"
                 holding={portfolio.usd}
-                onEdit={() => setActiveDrawer("usd")}
+                onEdit={isViewer ? undefined : () => setActiveDrawer("usd")}
               />
               <PriceCard
                 title="Euro"
                 symbol={data.eur}
                 variant="euro"
                 holding={portfolio.eur}
-                onEdit={() => setActiveDrawer("eur")}
-              />
-            </div>
-
-            <Separator />
-
-            <div className="space-y-4">
-              <PriceChart
-                title="Gram Altın"
-                data={data.gold.timeSeries}
-                color="#F59E0B"
-              />
-              <PriceChart
-                title="USD/TRY"
-                data={data.usd.timeSeries}
-                color="#10B981"
-              />
-              <PriceChart
-                title="EUR/TRY"
-                data={data.eur.timeSeries}
-                color="#6366F1"
+                onEdit={isViewer ? undefined : () => setActiveDrawer("eur")}
               />
             </div>
 
@@ -219,41 +207,29 @@ export default function Home() {
         ) : null}
       </main>
 
-      <AssetDrawer
-        open={activeDrawer !== null}
-        onOpenChange={(open) => {
-          if (!open) setActiveDrawer(null);
-        }}
-        title={drawerConfig[drawerKey].title}
-        unit={drawerConfig[drawerKey].unit}
-        step={drawerConfig[drawerKey].step}
-        holding={portfolio[drawerKey]}
-        onSave={(h) => {
-          if (activeDrawer) updateAsset(activeDrawer, h);
-        }}
-      />
+      {!isViewer && (
+        <AssetDrawer
+          open={activeDrawer !== null}
+          onOpenChange={(open) => {
+            if (!open) setActiveDrawer(null);
+          }}
+          title={drawerConfig[drawerKey].title}
+          unit={drawerConfig[drawerKey].unit}
+          step={drawerConfig[drawerKey].step}
+          holding={portfolio[drawerKey]}
+          onSave={(h) => {
+            if (activeDrawer) updateAsset(activeDrawer, h);
+          }}
+        />
+      )}
 
-      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Varlıklarımı Sıfırla</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tüm varlıklar sıfırlansın mı? Bu işlem geri alınamaz.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>İptal</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                resetPortfolio();
-                setResetDialogOpen(false);
-              }}
-            >
-              Sıfırla
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {!isViewer && (
+        <ViewersPanel
+          open={viewersOpen}
+          onOpenChange={setViewersOpen}
+          user={user}
+        />
+      )}
     </div>
   );
 }
@@ -284,13 +260,13 @@ function GoogleIcon() {
 function LoadingSkeleton() {
   return (
     <div className="space-y-6">
+      <div className="h-64 animate-pulse rounded-xl bg-muted" />
       <div className="h-28 animate-pulse rounded-xl bg-muted" />
       <div className="grid gap-4 sm:grid-cols-2">
         {[1, 2].map((i) => (
           <div key={i} className="h-32 animate-pulse rounded-xl bg-muted" />
         ))}
       </div>
-      <div className="h-64 animate-pulse rounded-xl bg-muted" />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Portfolio, AssetHolding, AssetKey } from "@/lib/types";
+import { Portfolio, AssetHolding, AssetKey, AccountRole } from "@/lib/types";
 import type { User } from "@supabase/supabase-js";
 
 const STORAGE_KEY = "altinim-portfolio";
@@ -38,19 +38,43 @@ function saveLocal(p: Portfolio) {
 
 function isEmpty(p: Portfolio) {
   return (
-    p.gold.physical === 0 && p.gold.digital === 0 &&
-    p.usd.physical === 0 && p.usd.digital === 0 &&
-    p.eur.physical === 0 && p.eur.digital === 0
+    p.gold.physical === 0 &&
+    p.gold.digital === 0 &&
+    p.usd.physical === 0 &&
+    p.usd.digital === 0 &&
+    p.eur.physical === 0 &&
+    p.eur.digital === 0
   );
+}
+
+function parsePortfolio(data: Record<string, unknown>): Portfolio {
+  return {
+    gold: {
+      physical: Number((data.gold as AssetHolding)?.physical) || 0,
+      digital: Number((data.gold as AssetHolding)?.digital) || 0,
+    },
+    usd: {
+      physical: Number((data.usd as AssetHolding)?.physical) || 0,
+      digital: Number((data.usd as AssetHolding)?.digital) || 0,
+    },
+    eur: {
+      physical: Number((data.eur as AssetHolding)?.physical) || 0,
+      digital: Number((data.eur as AssetHolding)?.digital) || 0,
+    },
+  };
 }
 
 export function usePortfolio(user: User | null) {
   const [portfolio, setPortfolio] = useState<Portfolio>(loadLocal);
+  const [access, setAccess] = useState<AccountRole>("owner");
   const userRef = useRef<User | null>(null);
+  const accessRef = useRef<AccountRole>("owner");
 
   useEffect(() => {
     if (!user) {
       userRef.current = null;
+      accessRef.current = "owner";
+      setAccess("owner");
       setPortfolio(loadLocal());
       return;
     }
@@ -60,13 +84,19 @@ export function usePortfolio(user: User | null) {
 
     (async () => {
       try {
-        const res = await fetch("/api/portfolio");
+        const res = await fetch("/api/portfolio", { cache: "no-store" });
         const data = await res.json();
-        setPortfolio(data);
-        saveLocal(data);
+        const role: AccountRole = data.access === "viewer" ? "viewer" : "owner";
+        const next = parsePortfolio(data);
+        accessRef.current = role;
+        setAccess(role);
+        setPortfolio(next);
+        if (role === "owner") saveLocal(next);
       } catch {
         const local = loadLocal();
         setPortfolio(local);
+        setAccess("owner");
+        accessRef.current = "owner";
         if (!isEmpty(local)) {
           try {
             await fetch("/api/portfolio", {
@@ -84,6 +114,8 @@ export function usePortfolio(user: User | null) {
 
   const updateAsset = useCallback(
     async (key: AssetKey, holding: AssetHolding) => {
+      if (accessRef.current === "viewer") return;
+
       const next = { ...portfolio, [key]: holding };
       setPortfolio(next);
       saveLocal(next);
@@ -103,22 +135,5 @@ export function usePortfolio(user: User | null) {
     [portfolio]
   );
 
-  const resetPortfolio = useCallback(async () => {
-    setPortfolio(DEFAULT);
-    saveLocal(DEFAULT);
-
-    if (userRef.current) {
-      try {
-        await fetch("/api/portfolio", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(DEFAULT),
-        });
-      } catch {
-        /* ignore */
-      }
-    }
-  }, []);
-
-  return { portfolio, updateAsset, resetPortfolio };
+  return { portfolio, updateAsset, access, isViewer: access === "viewer" };
 }
