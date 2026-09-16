@@ -17,6 +17,8 @@ const drawerConfig: Record<AssetKey, { title: string; unit: string; step: number
   eur: { title: "Euro Varlığım", unit: "€", step: 100 },
 };
 
+const isDev = process.env.NODE_ENV === "development";
+
 export default function Home() {
   const { data, loading, error, lastFetch, refetch } = useMarketData();
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
@@ -50,7 +52,7 @@ export default function Home() {
     }
   }, []);
 
-  if (!authLoading && !user) {
+  if (!authLoading && !user && !isDev) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
         <img
@@ -75,7 +77,7 @@ export default function Home() {
     );
   }
 
-  if (authLoading) {
+  if (authLoading && !isDev) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-8 w-8 animate-pulse rounded-lg bg-muted" />
@@ -115,7 +117,7 @@ export default function Home() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              {!isViewer && (
+              {user && !isViewer && (
                 <button
                   onClick={() => setViewersOpen(true)}
                   className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -132,13 +134,19 @@ export default function Home() {
                   referrerPolicy="no-referrer"
                 />
               )}
-              <button
-                onClick={signOut}
-                className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                title="Çıkış Yap"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
+              {user ? (
+                <button
+                  onClick={signOut}
+                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  title="Çıkış Yap"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              ) : isDev ? (
+                <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Dev
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
@@ -173,7 +181,7 @@ export default function Home() {
           <ErrorState message={error} onRetry={refetch} />
         ) : data ? (
           <div className="space-y-6">
-            <SavingsSection user={user} />
+            <SavingsSection user={user} assetTotal={totalTL} />
 
             <GoldCard
               title="Gram Altın"
@@ -223,7 +231,7 @@ export default function Home() {
         />
       )}
 
-      {!isViewer && (
+      {!isViewer && user && (
         <ViewersPanel
           open={viewersOpen}
           onOpenChange={setViewersOpen}

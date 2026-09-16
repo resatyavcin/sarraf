@@ -47,6 +47,11 @@ export interface SavingEntry {
   amount: number;
 }
 
+export interface SavingsGoal {
+  targetAmount: number;
+  targetDate: string; // "YYYY-MM-DD"
+}
+
 export interface ViewerEntry {
   email: string;
   createdAt: string;
