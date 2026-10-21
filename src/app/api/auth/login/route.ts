@@ -3,12 +3,21 @@ import { cookies } from "next/headers";
 import {
   createServerSupabase,
   hasSupabaseConfig,
+  publicOrigin,
   redirectWithCookies,
   type CookieToSet,
 } from "@/lib/supabase-server";
 
 export async function GET(request: Request) {
-  const origin = new URL(request.url).origin;
+  const host = request.headers.get("host") ?? "";
+  const hostname = host.startsWith("[")
+    ? host.slice(1, host.indexOf("]"))
+    : host.split(":")[0];
+  const origin = publicOrigin(request);
+  if (hostname === "127.0.0.1" || hostname === "::1") {
+    const requestUrl = new URL(request.url);
+    return NextResponse.redirect(`${origin}${requestUrl.pathname}${requestUrl.search}`);
+  }
 
   if (!hasSupabaseConfig()) {
     return NextResponse.redirect(`${origin}?error=config`);

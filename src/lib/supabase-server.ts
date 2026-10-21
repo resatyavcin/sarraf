@@ -13,6 +13,32 @@ export function hasSupabaseConfig() {
   return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_ANON);
 }
 
+function splitHost(host: string) {
+  if (host.startsWith("[")) {
+    const end = host.indexOf("]");
+    return {
+      hostname: host.slice(1, end),
+      port: host.slice(end + 2),
+    };
+  }
+  const index = host.lastIndexOf(":");
+  if (index === -1) return { hostname: host, port: "" };
+  return { hostname: host.slice(0, index), port: host.slice(index + 1) };
+}
+
+/** OAuth must return to the local dev server. A forwarded https proto makes
+ * redirect_to https://localhost, which Supabase rejects and replaces with the
+ * production Site URL. */
+export function publicOrigin(request: Request) {
+  const url = new URL(request.url);
+  const host = request.headers.get("host") ?? url.host;
+  const { hostname, port } = splitHost(host);
+  const isLocal =
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  if (!isLocal) return url.origin;
+  return `http://localhost:${port || url.port || "3000"}`;
+}
+
 export function createServerSupabase(
   cookieStore: CookieStore,
   onSet?: (cookies: CookieToSet[]) => void

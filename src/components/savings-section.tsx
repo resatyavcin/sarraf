@@ -12,7 +12,6 @@ import { PiggyBank } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { useSavings } from "@/hooks/use-savings";
 import { SavingsDrawer } from "@/components/savings-drawer";
-import { GoalProgressCard } from "@/components/goal-progress-card";
 
 const SHORT_MONTHS = [
   "Oca",
@@ -51,11 +50,9 @@ const chartConfig = {
 
 interface SavingsSectionProps {
   user: User | null;
-  /** Toplam varlık (TL) — hedef ilerlemesi buna göre hesaplanır */
-  assetTotal: number;
 }
 
-export function SavingsSection({ user, assetTotal }: SavingsSectionProps) {
+export function SavingsSection({ user }: SavingsSectionProps) {
   const { entries, setMonth, totals, isViewer } = useSavings(user);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editMonth, setEditMonth] = useState(currentMonthKey);
@@ -78,14 +75,6 @@ export function SavingsSection({ user, assetTotal }: SavingsSectionProps) {
 
   return (
     <>
-      <section className="rounded-2xl border bg-card p-5">
-        <GoalProgressCard
-          user={user}
-          entries={entries}
-          assetTotal={assetTotal}
-        />
-      </section>
-
       <section className="rounded-2xl border bg-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">

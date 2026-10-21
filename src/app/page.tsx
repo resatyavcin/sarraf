@@ -4,26 +4,22 @@ import { useState, useMemo, useEffect } from "react";
 import { useMarketData } from "@/hooks/use-market-data";
 import { useAuth } from "@/hooks/use-auth";
 import { usePortfolio } from "@/hooks/use-portfolio";
-import { PriceCard, GoldCard } from "@/components/price-card";
 import { AssetDrawer } from "@/components/asset-drawer";
 import { SavingsSection } from "@/components/savings-section";
 import { ViewersPanel } from "@/components/viewers-panel";
-import { Wifi, WifiOff, Clock, Wallet, LogOut, UserPlus, Eye } from "lucide-react";
-import { AssetKey } from "@/lib/types";
-
-const drawerConfig: Record<AssetKey, { title: string; unit: string; step: number }> = {
-  gold: { title: "Gram Altın Varlığım", unit: "gr", step: 1 },
-  usd: { title: "Dolar Varlığım", unit: "$", step: 100 },
-  eur: { title: "Euro Varlığım", unit: "€", step: 100 },
-};
+import { Wifi, WifiOff, Clock, WalletMinimal, LogOut, UserPlus, Eye, Plus, Gem } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 
 const isDev = process.env.NODE_ENV === "development";
+
+const goldDrawer = { title: "Gram Altın Varlığım", unit: "gr", step: 1 };
 
 export default function Home() {
   const { data, loading, error, lastFetch, refetch } = useMarketData();
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
   const { portfolio, updateAsset, isViewer } = usePortfolio(user);
-  const [activeDrawer, setActiveDrawer] = useState<AssetKey | null>(null);
+  const [goldDrawerOpen, setGoldDrawerOpen] = useState(false);
   const [viewersOpen, setViewersOpen] = useState(false);
 
   const CURRENCY_SPREAD = 0.008;
@@ -40,8 +36,6 @@ export default function Home() {
       (portfolio.eur.physical + portfolio.eur.digital) * eurBuy;
     return goldVal + usdVal + eurVal;
   }, [data, portfolio]);
-
-  const drawerKey = activeDrawer ?? "gold";
 
   // Supabase bazen code'u / yerine /auth/callback'e gönderir; /?code= gelirse callback'e yönlendir
   useEffect(() => {
@@ -77,12 +71,8 @@ export default function Home() {
     );
   }
 
-  if (authLoading && !isDev) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-pulse rounded-lg bg-muted" />
-      </div>
-    );
+  if (authLoading) {
+    return <PageLoading />;
   }
 
   return (
@@ -142,17 +132,13 @@ export default function Home() {
                 >
                   <LogOut className="h-4 w-4" />
                 </button>
-              ) : isDev ? (
-                <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Dev
-                </span>
               ) : null}
             </div>
           </div>
         </div>
         <div className="border-t border-b bg-muted/30">
           <div className="mx-auto flex max-w-4xl items-center gap-2 px-4 py-2">
-            <Wallet className="h-4 w-4 text-foreground" />
+            <WalletMinimal className="h-4 w-4 text-foreground" />
             <span className="text-sm font-semibold tabular-nums">
               {totalTL > 0
                 ? `${totalTL.toLocaleString("tr-TR", {
@@ -161,7 +147,58 @@ export default function Home() {
                   })} ₺`
                 : "0,00 ₺"}
             </span>
-            <span className="text-xs text-muted-foreground">toplam varlık</span>
+            <span className="text-xs text-muted-foreground">Toplam Varlık</span>
+          </div>
+        </div>
+        <div className="border-b border-amber-200/60 bg-gradient-to-r from-amber-50 via-amber-50/40 to-yellow-50/50 dark:border-amber-500/20 dark:from-amber-950/40 dark:via-amber-950/20 dark:to-yellow-950/10">
+          <div className="mx-auto flex max-w-4xl items-center gap-2.5 px-4 py-2">
+            {!isViewer && (
+              <button
+                type="button"
+                onClick={() => setGoldDrawerOpen(true)}
+                className="rounded-lg p-1 text-amber-700 transition-colors hover:bg-amber-500/10 dark:text-amber-300"
+                title="Varlık Ekle"
+                aria-label="Gram altın ekle"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            )}
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/15">
+              <Gem className="h-4 w-4 text-amber-500" />
+            </div>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Gram Altın
+            </span>
+            <div className="ml-auto flex items-center gap-4">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+                  Alış
+                </span>
+                <span className="text-sm font-semibold tabular-nums tracking-tight text-amber-600 dark:text-amber-400">
+                  {data
+                    ? data.gold.gramBuy.toLocaleString("tr-TR", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })
+                    : "—"}
+                  <span className="ml-0.5 text-xs font-normal text-muted-foreground">₺</span>
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+                  Satış
+                </span>
+                <span className="text-sm font-semibold tabular-nums tracking-tight text-amber-600 dark:text-amber-400">
+                  {data
+                    ? data.gold.gramSell.toLocaleString("tr-TR", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })
+                    : "—"}
+                  <span className="ml-0.5 text-xs font-normal text-muted-foreground">₺</span>
+                </span>
+              </div>
+            </div>
           </div>
         </div>
         {isViewer && (
@@ -181,32 +218,7 @@ export default function Home() {
           <ErrorState message={error} onRetry={refetch} />
         ) : data ? (
           <div className="space-y-6">
-            <SavingsSection user={user} assetTotal={totalTL} />
-
-            <GoldCard
-              title="Gram Altın"
-              gramBuy={data.gold.gramBuy}
-              gramSell={data.gold.gramSell}
-              holding={portfolio.gold}
-              onEdit={isViewer ? undefined : () => setActiveDrawer("gold")}
-            />
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <PriceCard
-                title="Dolar"
-                symbol={data.usd}
-                variant="dollar"
-                holding={portfolio.usd}
-                onEdit={isViewer ? undefined : () => setActiveDrawer("usd")}
-              />
-              <PriceCard
-                title="Euro"
-                symbol={data.eur}
-                variant="euro"
-                holding={portfolio.eur}
-                onEdit={isViewer ? undefined : () => setActiveDrawer("eur")}
-              />
-            </div>
+            <SavingsSection user={user} />
 
             <p className="pb-4 text-center text-xs text-muted-foreground">
               Veriler Twelve Data API&apos;den alınmaktadır • 10 dakikada bir güncellenir
@@ -217,17 +229,13 @@ export default function Home() {
 
       {!isViewer && (
         <AssetDrawer
-          open={activeDrawer !== null}
-          onOpenChange={(open) => {
-            if (!open) setActiveDrawer(null);
-          }}
-          title={drawerConfig[drawerKey].title}
-          unit={drawerConfig[drawerKey].unit}
-          step={drawerConfig[drawerKey].step}
-          holding={portfolio[drawerKey]}
-          onSave={(h) => {
-            if (activeDrawer) updateAsset(activeDrawer, h);
-          }}
+          open={goldDrawerOpen}
+          onOpenChange={setGoldDrawerOpen}
+          title={goldDrawer.title}
+          unit={goldDrawer.unit}
+          step={goldDrawer.step}
+          holding={portfolio.gold}
+          onSave={(h) => updateAsset("gold", h)}
         />
       )}
 
@@ -265,16 +273,40 @@ function GoogleIcon() {
   );
 }
 
+function LoadingStatus() {
+  return (
+    <div className="flex items-center justify-center gap-3">
+      <Spinner aria-hidden className="size-5 text-muted-foreground" role="presentation" />
+      <p
+        role="status"
+        className="shimmer text-lg font-semibold tracking-[0.35em] text-muted-foreground"
+      >
+        YÜKLENİYOR
+      </p>
+    </div>
+  );
+}
+
+function PageLoading() {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-background">
+      <img
+        src="/icons/icon-192.png"
+        alt="Sarraf"
+        className="h-12 w-12 rounded-xl"
+        width={48}
+        height={48}
+      />
+      <LoadingStatus />
+    </div>
+  );
+}
+
 function LoadingSkeleton() {
   return (
-    <div className="space-y-6">
-      <div className="h-64 animate-pulse rounded-xl bg-muted" />
-      <div className="h-28 animate-pulse rounded-xl bg-muted" />
-      <div className="grid gap-4 sm:grid-cols-2">
-        {[1, 2].map((i) => (
-          <div key={i} className="h-32 animate-pulse rounded-xl bg-muted" />
-        ))}
-      </div>
+    <div className="space-y-6" aria-busy="true">
+      <LoadingStatus />
+      <Skeleton className="h-64 rounded-xl" />
     </div>
   );
 }
