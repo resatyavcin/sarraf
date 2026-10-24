@@ -8,6 +8,12 @@ export function useViewers(user: User | null, enabled: boolean) {
   const [viewers, setViewers] = useState<ViewerEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [prevEnabled, setPrevEnabled] = useState(enabled);
+
+  if (enabled !== prevEnabled) {
+    setPrevEnabled(enabled);
+    if (enabled && user) setLoading(true);
+  }
 
   const refresh = useCallback(async () => {
     if (!user || !enabled) {

@@ -4,22 +4,21 @@ import { useState, useMemo, useEffect } from "react";
 import { useMarketData } from "@/hooks/use-market-data";
 import { useAuth } from "@/hooks/use-auth";
 import { usePortfolio } from "@/hooks/use-portfolio";
-import { AssetDrawer } from "@/components/asset-drawer";
+import { GoldAddSheet } from "@/components/gold-add-sheet";
 import { SavingsSection } from "@/components/savings-section";
 import { ViewersPanel } from "@/components/viewers-panel";
-import { Wifi, WifiOff, Clock, WalletMinimal, LogOut, UserPlus, Eye, Plus, Gem } from "lucide-react";
+import { useGoldLedger, type GoldLedgerEntry, type GoldSide } from "@/hooks/use-gold-ledger";
+import { playTick } from "@/lib/play-tick";
+import { Wifi, WifiOff, Clock, WalletMinimal, LogOut, UserPlus, Eye, Gem } from "lucide-react";
+import { LoadingStatus } from "@/components/loading-status";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
-
-const isDev = process.env.NODE_ENV === "development";
-
-const goldDrawer = { title: "Gram Altın Varlığım", unit: "gr", step: 1 };
 
 export default function Home() {
   const { data, loading, error, lastFetch, refetch } = useMarketData();
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
-  const { portfolio, updateAsset, isViewer } = usePortfolio(user);
-  const [goldDrawerOpen, setGoldDrawerOpen] = useState(false);
+  const { portfolio, adjustAsset, isViewer } = usePortfolio(user);
+  const { entries, push, drop } = useGoldLedger();
+  const [addSide, setAddSide] = useState<GoldSide | null>(null);
   const [viewersOpen, setViewersOpen] = useState(false);
 
   const CURRENCY_SPREAD = 0.008;
@@ -46,7 +45,7 @@ export default function Home() {
     }
   }, []);
 
-  if (!authLoading && !user && !isDev) {
+  if (!authLoading && !user) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
         <img
@@ -78,20 +77,20 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2">
+        <div className="mx-auto flex h-14 max-w-lg items-center justify-between gap-2 px-4">
+          <div className="flex min-w-0 items-center gap-2">
             <img
               src="/icons/icon-192.png"
               alt="Sarraf"
-              className="h-8 w-8 rounded-lg"
+              className="h-8 w-8 shrink-0 rounded-lg object-cover"
               width={32}
               height={32}
             />
-            <h1 className="text-lg font-bold tracking-tight">Sarraf</h1>
+            <h1 className="truncate text-base font-semibold tracking-tight">Sarraf</h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-0.5">
             {lastFetch && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <span className="mr-1 flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground">
                 <Clock className="h-3 w-3" />
                 {lastFetch.toLocaleTimeString("tr-TR", {
                   hour: "2-digit",
@@ -99,41 +98,41 @@ export default function Home() {
                 })}
               </span>
             )}
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span className="flex h-8 w-8 items-center justify-center">
               {error ? (
-                <WifiOff className="h-3.5 w-3.5 text-red-500" />
+                <WifiOff className="h-4 w-4 text-red-500" />
               ) : (
-                <Wifi className="h-3.5 w-3.5 text-emerald-500" />
+                <Wifi className="h-4 w-4 text-emerald-500" />
               )}
-            </div>
-            <div className="flex items-center gap-2">
-              {user && !isViewer && (
-                <button
-                  onClick={() => setViewersOpen(true)}
-                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  title="Görüntüleyici ekle"
-                >
-                  <UserPlus className="h-4 w-4" />
-                </button>
-              )}
-              {user?.user_metadata?.avatar_url && (
-                <img
-                  src={user.user_metadata.avatar_url}
-                  alt=""
-                  className="h-7 w-7 rounded-full"
-                  referrerPolicy="no-referrer"
-                />
-              )}
-              {user ? (
-                <button
-                  onClick={signOut}
-                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  title="Çıkış Yap"
-                >
-                  <LogOut className="h-4 w-4" />
-                </button>
-              ) : null}
-            </div>
+            </span>
+            {user && !isViewer && (
+              <button
+                onClick={() => setViewersOpen(true)}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                title="Görüntüleyici ekle"
+              >
+                <UserPlus className="h-4 w-4" />
+              </button>
+            )}
+            {user?.user_metadata?.avatar_url && (
+              <img
+                src={user.user_metadata.avatar_url}
+                alt=""
+                width={32}
+                height={32}
+                className="ml-1 h-8 w-8 max-h-8 max-w-8 shrink-0 rounded-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            )}
+            {user ? (
+              <button
+                onClick={signOut}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                title="Çıkış Yap"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            ) : null}
           </div>
         </div>
         <div className="border-t border-b bg-muted/30">
@@ -150,57 +149,6 @@ export default function Home() {
             <span className="text-xs text-muted-foreground">Toplam Varlık</span>
           </div>
         </div>
-        <div className="border-b border-amber-200/60 bg-gradient-to-r from-amber-50 via-amber-50/40 to-yellow-50/50 dark:border-amber-500/20 dark:from-amber-950/40 dark:via-amber-950/20 dark:to-yellow-950/10">
-          <div className="mx-auto flex max-w-4xl items-center gap-2.5 px-4 py-2">
-            {!isViewer && (
-              <button
-                type="button"
-                onClick={() => setGoldDrawerOpen(true)}
-                className="rounded-lg p-1 text-amber-700 transition-colors hover:bg-amber-500/10 dark:text-amber-300"
-                title="Varlık Ekle"
-                aria-label="Gram altın ekle"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            )}
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/15">
-              <Gem className="h-4 w-4 text-amber-500" />
-            </div>
-            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Gram Altın
-            </span>
-            <div className="ml-auto flex items-center gap-4">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
-                  Alış
-                </span>
-                <span className="text-sm font-semibold tabular-nums tracking-tight text-amber-600 dark:text-amber-400">
-                  {data
-                    ? data.gold.gramBuy.toLocaleString("tr-TR", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })
-                    : "—"}
-                  <span className="ml-0.5 text-xs font-normal text-muted-foreground">₺</span>
-                </span>
-              </div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
-                  Satış
-                </span>
-                <span className="text-sm font-semibold tabular-nums tracking-tight text-amber-600 dark:text-amber-400">
-                  {data
-                    ? data.gold.gramSell.toLocaleString("tr-TR", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })
-                    : "—"}
-                  <span className="ml-0.5 text-xs font-normal text-muted-foreground">₺</span>
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
         {isViewer && (
           <div className="border-b bg-amber-500/10">
             <div className="mx-auto flex max-w-4xl items-center gap-2 px-4 py-2 text-xs text-amber-800 dark:text-amber-200">
@@ -211,7 +159,62 @@ export default function Home() {
         )}
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-6">
+      <main className="mx-auto max-w-4xl space-y-6 px-4 py-6">
+        <div className="overflow-hidden rounded-2xl border border-amber-200/70 bg-gradient-to-br from-amber-50 via-card to-yellow-50/40 shadow-sm dark:border-amber-500/20 dark:from-amber-950/30 dark:via-card dark:to-yellow-950/10">
+          <div className="flex items-center gap-2.5 px-5 pt-5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/15">
+              <Gem className="h-5 w-5 text-amber-500" />
+            </div>
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Gram Altın
+            </span>
+          </div>
+          <div className="mt-5 grid grid-cols-2 gap-4 px-5">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+                Alış
+              </p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-amber-600 dark:text-amber-400">
+                {data
+                  ? data.gold.gramBuy.toLocaleString("tr-TR", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })
+                  : "—"}
+                <span className="ml-1 text-sm font-normal text-muted-foreground">₺</span>
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+                Satış
+              </p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-amber-600 dark:text-amber-400">
+                {data
+                  ? data.gold.gramSell.toLocaleString("tr-TR", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })
+                  : "—"}
+                <span className="ml-1 text-sm font-normal text-muted-foreground">₺</span>
+              </p>
+            </div>
+          </div>
+          <div className="mt-5 grid grid-cols-2 border-t border-amber-200/70 dark:border-amber-500/20">
+            <HoldingButton
+              label="Fiziksel"
+              grams={portfolio.gold.physical}
+              disabled={isViewer}
+              onClick={() => setAddSide("physical")}
+            />
+            <HoldingButton
+              label="Dijital"
+              grams={portfolio.gold.digital}
+              disabled={isViewer}
+              onClick={() => setAddSide("digital")}
+              divided
+            />
+          </div>
+        </div>
         {loading && !data ? (
           <LoadingSkeleton />
         ) : error && !data ? (
@@ -228,14 +231,21 @@ export default function Home() {
       </main>
 
       {!isViewer && (
-        <AssetDrawer
-          open={goldDrawerOpen}
-          onOpenChange={setGoldDrawerOpen}
-          title={goldDrawer.title}
-          unit={goldDrawer.unit}
-          step={goldDrawer.step}
-          holding={portfolio.gold}
-          onSave={(h) => updateAsset("gold", h)}
+        <GoldAddSheet
+          side={addSide}
+          total={addSide ? portfolio.gold[addSide] : 0}
+          entries={entries.filter((e) => e.side === addSide)}
+          onOpenChange={(open) => {
+            if (!open) setAddSide(null);
+          }}
+          onAdd={(side, grams) => {
+            push(side, grams);
+            adjustAsset("gold", side, grams);
+          }}
+          onUndo={(entry: GoldLedgerEntry) => {
+            drop(entry.id);
+            adjustAsset("gold", entry.side, -entry.grams);
+          }}
         />
       )}
 
@@ -247,6 +257,41 @@ export default function Home() {
         />
       )}
     </div>
+  );
+}
+
+function HoldingButton({
+  label,
+  grams,
+  disabled,
+  divided,
+  onClick,
+}: {
+  label: string;
+  grams: number;
+  disabled: boolean;
+  divided?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => {
+        playTick();
+        onClick();
+      }}
+      className={`px-5 py-3.5 text-left transition-colors enabled:hover:bg-amber-500/10 enabled:active:bg-amber-500/15 disabled:cursor-default ${
+        divided ? "border-l border-amber-200/70 dark:border-amber-500/20" : ""
+      }`}
+    >
+      <p className="text-[11px] font-medium tracking-widest text-muted-foreground uppercase">
+        {label}
+      </p>
+      <p className="mt-0.5 text-sm font-semibold tabular-nums">
+        {grams.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} gr
+      </p>
+    </button>
   );
 }
 
@@ -270,20 +315,6 @@ function GoogleIcon() {
         fill="#EA4335"
       />
     </svg>
-  );
-}
-
-function LoadingStatus() {
-  return (
-    <div className="flex items-center justify-center gap-3">
-      <Spinner aria-hidden className="size-5 text-muted-foreground" role="presentation" />
-      <p
-        role="status"
-        className="shimmer text-lg font-semibold tracking-[0.35em] text-muted-foreground"
-      >
-        YÜKLENİYOR
-      </p>
-    </div>
   );
 }
 

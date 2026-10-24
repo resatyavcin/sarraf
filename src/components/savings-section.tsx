@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
 import {
   ChartConfig,
   ChartContainer,
@@ -28,9 +28,38 @@ const SHORT_MONTHS = [
   "Ara",
 ];
 
-function shortMonthLabel(month: string) {
-  const m = Number(month.split("-")[1]) || 1;
-  return SHORT_MONTHS[m - 1];
+function monthParts(month: string) {
+  const [yearText, monthText] = month.split("-");
+  const monthIndex = (Number(monthText) || 1) - 1;
+  return {
+    name: SHORT_MONTHS[monthIndex] ?? month,
+    year: yearText?.slice(2) ?? "",
+    full: `${SHORT_MONTHS[monthIndex] ?? month} ${yearText ?? ""}`.trim(),
+  };
+}
+
+function MonthTick({
+  x = 0,
+  y = 0,
+  payload,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value?: string };
+}) {
+  const [name, year] = String(payload?.value ?? "").split("|");
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text textAnchor="middle" className="fill-muted-foreground">
+        <tspan x={0} dy={12} fontSize={11}>
+          {name}
+        </tspan>
+        <tspan x={0} dy={12} fontSize={10}>
+          {year}
+        </tspan>
+      </text>
+    </g>
+  );
 }
 
 function currentMonthKey() {
@@ -57,15 +86,24 @@ export function SavingsSection({ user }: SavingsSectionProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editMonth, setEditMonth] = useState(currentMonthKey);
 
-  const chartData = useMemo(
-    () =>
-      entries.map((e) => ({
+  const chartData = useMemo(() => {
+    const current = currentMonthKey();
+    return entries.map((e) => {
+      const parts = monthParts(e.month);
+      return {
         month: e.month,
-        label: shortMonthLabel(e.month),
+        label: `${parts.name}|'${parts.year}`,
+        full: parts.full,
         amount: e.amount,
-      })),
-    [entries]
-  );
+        current: e.month === current,
+      };
+    });
+  }, [entries]);
+
+  const rangeLabel =
+    chartData.length > 0
+      ? `${chartData[0].full} – ${chartData[chartData.length - 1].full}`
+      : "";
 
   function openEdit(month: string) {
     if (isViewer) return;
@@ -84,7 +122,8 @@ export function SavingsSection({ user }: SavingsSectionProps) {
             <div>
               <h2 className="text-sm font-semibold">Aylık Birikim</h2>
               <p className="text-xs text-muted-foreground">
-                Son 12 ay · maaştan kenara ayrılan nakit
+                Son 12 ay{rangeLabel ? ` · ${rangeLabel}` : ""} · maaştan kenara
+                ayrılan nakit
               </p>
             </div>
           </div>
@@ -119,18 +158,20 @@ export function SavingsSection({ user }: SavingsSectionProps) {
         </div>
 
         <div className="mt-4">
-          <ChartContainer config={chartConfig} className="h-50 w-full">
+          <ChartContainer config={chartConfig} className="h-56 w-full">
             <BarChart
               data={chartData}
-              margin={{ top: 8, right: 4, left: 0, bottom: 0 }}
+              margin={{ top: 8, right: 4, left: 0, bottom: 8 }}
             >
               <CartesianGrid vertical={false} strokeDasharray="3 3" />
               <XAxis
                 dataKey="label"
+                interval={0}
                 tickLine={false}
                 axisLine={false}
-                tickMargin={8}
-                fontSize={11}
+                tickMargin={4}
+                height={36}
+                tick={<MonthTick />}
               />
               <YAxis
                 tickLine={false}
@@ -152,19 +193,16 @@ export function SavingsSection({ user }: SavingsSectionProps) {
                       </span>
                     )}
                     labelFormatter={(_, payload) => {
-                      const month = payload?.[0]?.payload?.month as
+                      const full = payload?.[0]?.payload?.full as
                         | string
                         | undefined;
-                      if (!month) return "";
-                      const [y, m] = month.split("-").map(Number);
-                      return `${SHORT_MONTHS[(m ?? 1) - 1]} ${y}`;
+                      return full ?? "";
                     }}
                   />
                 }
               />
               <Bar
                 dataKey="amount"
-                fill="var(--color-amount)"
                 radius={[4, 4, 0, 0]}
                 cursor={isViewer ? "default" : "pointer"}
                 onClick={(data) => {
@@ -172,7 +210,18 @@ export function SavingsSection({ user }: SavingsSectionProps) {
                   const month = (data as { month?: string })?.month;
                   if (month) openEdit(month);
                 }}
-              />
+              >
+                {chartData.map((entry) => (
+                  <Cell
+                    key={entry.month}
+                    fill={
+                      entry.current
+                        ? "hsl(142 72% 29%)"
+                        : "var(--color-amount)"
+                    }
+                  />
+                ))}
+              </Bar>
             </BarChart>
           </ChartContainer>
         </div>

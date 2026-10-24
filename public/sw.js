@@ -1,5 +1,5 @@
-const CACHE_NAME = "sarraf-v2";
-const API_CACHE_NAME = "sarraf-api-v2";
+const CACHE_NAME = "sarraf-v3";
+const API_CACHE_NAME = "sarraf-api-v3";
 
 const STATIC_ASSETS = ["/", "/manifest.json"];
 

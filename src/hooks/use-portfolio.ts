@@ -112,11 +112,15 @@ export function usePortfolio(user: User | null) {
     })();
   }, [user]);
 
+  const portfolioRef = useRef(portfolio);
+  portfolioRef.current = portfolio;
+
   const updateAsset = useCallback(
     async (key: AssetKey, holding: AssetHolding) => {
       if (accessRef.current === "viewer") return;
 
-      const next = { ...portfolio, [key]: holding };
+      const next = { ...portfolioRef.current, [key]: holding };
+      portfolioRef.current = next;
       setPortfolio(next);
       saveLocal(next);
 
@@ -132,8 +136,19 @@ export function usePortfolio(user: User | null) {
         }
       }
     },
-    [portfolio]
+    []
   );
 
-  return { portfolio, updateAsset, access, isViewer: access === "viewer" };
+  const adjustAsset = useCallback(
+    (key: AssetKey, side: keyof AssetHolding, delta: number) => {
+      const current = portfolioRef.current[key];
+      return updateAsset(key, {
+        ...current,
+        [side]: Math.max(0, Math.round((current[side] + delta) * 100) / 100),
+      });
+    },
+    [updateAsset]
+  );
+
+  return { portfolio, updateAsset, adjustAsset, access, isViewer: access === "viewer" };
 }

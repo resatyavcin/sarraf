@@ -5,6 +5,7 @@ import { Dialog } from "radix-ui";
 import { UserPlus, X, Trash2 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { useViewers } from "@/hooks/use-viewers";
+import { LoadingStatus } from "@/components/loading-status";
 
 interface ViewersPanelProps {
   open: boolean;
@@ -74,7 +75,9 @@ export function ViewersPanel({ open, onOpenChange, user }: ViewersPanelProps) {
 
           <div className="mt-5 space-y-2">
             {loading && viewers.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Yükleniyor…</p>
+              <div className="flex justify-center py-6">
+                <LoadingStatus />
+              </div>
             ) : viewers.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Henüz görüntüleyici yok
