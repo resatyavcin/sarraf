@@ -8,7 +8,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { PiggyBank } from "lucide-react";
+import { Pencil, PiggyBank } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { useSavings } from "@/hooks/use-savings";
 import { SavingsDrawer } from "@/components/savings-drawer";
@@ -114,44 +114,38 @@ export function SavingsSection({ user }: SavingsSectionProps) {
   return (
     <>
       <section className="rounded-2xl border bg-card p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/15">
-              <PiggyBank className="h-5 w-5 text-emerald-600" />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold">Aylık Birikim</h2>
-              <p className="text-xs text-muted-foreground">
-                Son 12 ay{rangeLabel ? ` · ${rangeLabel}` : ""} · maaştan kenara
-                ayrılan nakit
-              </p>
-            </div>
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15">
+            <PiggyBank className="h-5 w-5 text-emerald-600" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-semibold">Aylık Birikim</h2>
+            {rangeLabel && (
+              <p className="truncate text-xs text-muted-foreground">{rangeLabel}</p>
+            )}
           </div>
           {!isViewer && (
             <button
               type="button"
               onClick={() => openEdit(currentMonthKey())}
-              className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              aria-label="Bu ayı düzenle"
             >
-              Bu Ayı Düzenle
+              <Pencil className="h-4 w-4" />
             </button>
           )}
         </div>
 
-        <div className="mt-4 flex gap-6">
-          <div>
-            <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
-              Toplam
-            </p>
-            <p className="mt-0.5 text-lg font-semibold tabular-nums">
+        <div className="mt-5 grid grid-cols-2">
+          <div className="text-center">
+            <p className="text-xs font-medium text-muted-foreground">Toplam</p>
+            <p className="mt-1 text-xl font-semibold tracking-tight tabular-nums">
               {fmt(totals.sum)} ₺
             </p>
           </div>
-          <div>
-            <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
-              Ortalama
-            </p>
-            <p className="mt-0.5 text-lg font-semibold tabular-nums">
+          <div className="border-l text-center">
+            <p className="text-xs font-medium text-muted-foreground">Ortalama</p>
+            <p className="mt-1 text-xl font-semibold tracking-tight tabular-nums">
               {fmt(totals.average)} ₺
             </p>
           </div>
