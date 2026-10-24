@@ -1,33 +1,56 @@
 let ctx: AudioContext | null = null;
 
-/** Short tick matched to Beautiful UI's "tick" interaction sound. */
-export function playTick() {
+function audioContext(): AudioContext | null {
   const AudioCtx =
     window.AudioContext ||
     (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioCtx) return;
+  if (!AudioCtx) return null;
   if (!ctx) ctx = new AudioCtx();
-  if (ctx.state === "suspended") void ctx.resume();
+  return ctx;
+}
 
-  const t = ctx.currentTime;
-  const osc = ctx.createOscillator();
-  const filter = ctx.createBiquadFilter();
-  const gain = ctx.createGain();
+function sound(audio: AudioContext) {
+  const t = audio.currentTime;
+  const osc = audio.createOscillator();
+  const filter = audio.createBiquadFilter();
+  const gain = audio.createGain();
 
   osc.type = "square";
-  osc.frequency.value = 2100;
+  osc.frequency.setValueAtTime(2100, t);
   filter.type = "bandpass";
-  filter.frequency.value = 2600;
-  filter.Q.value = 1.6;
+  filter.frequency.setValueAtTime(2600, t);
+  filter.Q.setValueAtTime(1.6, t);
 
-  const peak = 0.24 * 0.32;
-  gain.gain.setValueAtTime(0.0001, t);
-  gain.gain.exponentialRampToValueAtTime(peak, t + 0.0004);
-  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.0284);
+  const peak = 0.2;
+  gain.gain.setValueAtTime(peak, t);
+  gain.gain.linearRampToValueAtTime(0.0001, t + 0.03);
 
   osc.connect(filter);
   filter.connect(gain);
-  gain.connect(ctx.destination);
+  gain.connect(audio.destination);
   osc.start(t);
-  osc.stop(t + 0.05);
+  osc.stop(t + 0.04);
+}
+
+/** Short tick. Safari drops notes scheduled while AudioContext is still suspended. */
+export function playTick() {
+  const audio = audioContext();
+  if (!audio) return;
+
+  if (audio.state === "suspended") {
+    const buffer = audio.createBuffer(1, 1, audio.sampleRate);
+    const src = audio.createBufferSource();
+    src.buffer = buffer;
+    src.connect(audio.destination);
+    src.start(0);
+  }
+
+  if (audio.state === "running") {
+    sound(audio);
+    return;
+  }
+
+  void audio.resume().then(() => {
+    if (audio.state === "running") sound(audio);
+  });
 }

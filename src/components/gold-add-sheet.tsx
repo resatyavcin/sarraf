@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Dialog } from "radix-ui";
-import { CalendarDays, Check, Delete, Undo2, X } from "lucide-react";
+import { Check, Delete, History, Undo2, X } from "lucide-react";
 import type { GoldLedgerEntry, GoldSide } from "@/hooks/use-gold-ledger";
 import { playTick } from "@/lib/play-tick";
 
@@ -106,19 +106,10 @@ export function GoldAddSheet({
                   playTick();
                   setHistoryOpen(true);
                 }}
-                className="rounded-lg px-2 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 aria-label="Son girişler"
               >
-                {entries[0] ? (
-                  <span className="text-xs font-medium tabular-nums text-foreground">
-                    {new Date(entries[0].at).toLocaleDateString("tr-TR", {
-                      day: "2-digit",
-                      month: "2-digit",
-                    })}
-                  </span>
-                ) : (
-                  <CalendarDays className="h-5 w-5" />
-                )}
+                <History className="h-5 w-5" />
               </button>
               <Dialog.Close
                 className="rounded-lg p-1.5 transition-colors hover:bg-muted"
@@ -140,8 +131,8 @@ export function GoldAddSheet({
                 key={key}
                 type="button"
                 onPointerDown={(event) => {
-                  event.preventDefault();
                   press(key);
+                  event.preventDefault();
                 }}
                 className="flex h-14 items-center justify-center rounded-2xl bg-muted text-xl font-medium tabular-nums active:bg-muted/70"
               >
@@ -154,8 +145,8 @@ export function GoldAddSheet({
             type="button"
             disabled={!canAdd}
             onPointerDown={(event) => {
-              event.preventDefault();
               submit();
+              event.preventDefault();
             }}
             aria-label="Ekle"
             className="mt-2 flex h-12 w-full items-center justify-center rounded-2xl bg-primary text-primary-foreground disabled:opacity-40"
