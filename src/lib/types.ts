@@ -56,3 +56,43 @@ export interface ViewerEntry {
   email: string;
   createdAt: string;
 }
+
+export interface BudgetItem {
+  id: string;
+  name: string;
+  amount: number;
+  validFrom: string;
+  validTo: string | null;
+}
+
+export type BudgetCategoryKind = "custom" | "statement";
+
+export interface BudgetCategory {
+  id: string;
+  name: string;
+  kind: BudgetCategoryKind;
+}
+
+export interface BudgetEntry {
+  id: string;
+  month: string;
+  categoryId: string;
+  label: string;
+  amount: number;
+}
+
+export type BudgetBank = "garanti" | "hadi" | "enpara" | "garanti-2";
+
+export interface BudgetStatement {
+  month: string;
+  bank: BudgetBank;
+  amount: number;
+}
+
+export interface BudgetSnapshot {
+  incomes: BudgetItem[];
+  fixedExpenses: BudgetItem[];
+  categories: BudgetCategory[];
+  entries: BudgetEntry[];
+  statements: BudgetStatement[];
+}

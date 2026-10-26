@@ -6,6 +6,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePortfolio } from "@/hooks/use-portfolio";
 import { GoldAddSheet } from "@/components/gold-add-sheet";
 import { SavingsSection } from "@/components/savings-section";
+import { BudgetSection } from "@/components/budget-section";
+import { SwipeDeck } from "@/components/swipe-deck";
+import { useSavings } from "@/hooks/use-savings";
 import { ViewersPanel } from "@/components/viewers-panel";
 import { useGoldLedger, type GoldLedgerEntry, type GoldSide } from "@/hooks/use-gold-ledger";
 import { playTick } from "@/lib/play-tick";
@@ -13,13 +16,23 @@ import { Wifi, WifiOff, Clock, WalletMinimal, LogOut, UserPlus, Eye, Gem } from 
 import { LoadingStatus } from "@/components/loading-status";
 import { Skeleton } from "@/components/ui/skeleton";
 
+const PAGES = ["Bütçe", "Birikim", "Varlık"] as const;
+
 export default function Home() {
   const { data, loading, error, lastFetch, refetch } = useMarketData();
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
   const { portfolio, adjustAsset, isViewer } = usePortfolio(user);
+  const {
+    entries: savingsEntries,
+    setMonth: setSavingsMonth,
+    totals: savingsTotals,
+    isViewer: savingsViewer,
+  } = useSavings(user);
+  const readOnly = isViewer || savingsViewer;
   const { entries, push, drop } = useGoldLedger();
   const [addSide, setAddSide] = useState<GoldSide | null>(null);
   const [viewersOpen, setViewersOpen] = useState(false);
+  const [page, setPage] = useState(0);
 
   const CURRENCY_SPREAD = 0.008;
 
@@ -105,7 +118,7 @@ export default function Home() {
                 <Wifi className="h-4 w-4 text-emerald-500" />
               )}
             </span>
-            {user && !isViewer && (
+            {user && !readOnly && (
               <button
                 onClick={() => setViewersOpen(true)}
                 className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -149,7 +162,7 @@ export default function Home() {
             <span className="text-xs text-muted-foreground">Toplam Varlık</span>
           </div>
         </div>
-        {isViewer && (
+        {readOnly && (
           <div className="border-b bg-amber-500/10">
             <div className="mx-auto flex max-w-4xl items-center gap-2 px-4 py-2 text-xs text-amber-800 dark:text-amber-200">
               <Eye className="h-3.5 w-3.5 shrink-0" />
@@ -157,10 +170,43 @@ export default function Home() {
             </div>
           </div>
         )}
+        <div className="border-b">
+          <div className="relative mx-auto max-w-4xl">
+            <div className="grid grid-cols-3">
+              {PAGES.map((label, index) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setPage(index)}
+                  className={`py-2.5 text-center text-sm ${
+                    index === page ? "font-medium text-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div
+              className="absolute bottom-0 left-0 h-0.5 w-1/3 bg-foreground transition-transform duration-300"
+              style={{ transform: `translateX(${page * 100}%)` }}
+            />
+          </div>
+        </div>
       </header>
 
-      <main className="mx-auto max-w-4xl space-y-6 px-4 py-6">
-        <div className="overflow-hidden rounded-2xl border border-amber-200/70 bg-gradient-to-br from-amber-50 via-card to-yellow-50/40 shadow-sm dark:border-amber-500/20 dark:from-amber-950/30 dark:via-card dark:to-yellow-950/10">
+      <main className="mx-auto max-w-4xl py-6">
+        <SwipeDeck index={page} onIndexChange={setPage}>
+          <BudgetSection user={user} readOnly={readOnly} />
+          <div className="space-y-6">
+            <SavingsSection
+              entries={savingsEntries}
+              totals={savingsTotals}
+              isViewer={readOnly}
+              onSave={setSavingsMonth}
+            />
+          </div>
+          <div className="space-y-6">
+            <div className="overflow-hidden rounded-2xl border border-amber-200/70 bg-gradient-to-br from-amber-50 via-card to-yellow-50/40 shadow-sm dark:border-amber-500/20 dark:from-amber-950/30 dark:via-card dark:to-yellow-950/10">
           <div className="flex items-center gap-2.5 px-5 pt-5">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/15">
               <Gem className="h-5 w-5 text-amber-500" />
@@ -203,13 +249,13 @@ export default function Home() {
             <HoldingButton
               label="Fiziksel"
               grams={portfolio.gold.physical}
-              disabled={isViewer}
+              disabled={readOnly}
               onClick={() => setAddSide("physical")}
             />
             <HoldingButton
               label="Dijital"
               grams={portfolio.gold.digital}
-              disabled={isViewer}
+              disabled={readOnly}
               onClick={() => setAddSide("digital")}
               divided
             />
@@ -219,18 +265,17 @@ export default function Home() {
           <LoadingSkeleton />
         ) : error && !data ? (
           <ErrorState message={error} onRetry={refetch} />
-        ) : data ? (
-          <div className="space-y-6">
-            <SavingsSection user={user} />
-
-            <p className="pb-4 text-center text-xs text-muted-foreground">
-              Veriler Twelve Data API&apos;den alınmaktadır • 10 dakikada bir güncellenir
-            </p>
-          </div>
         ) : null}
+            {data && (
+              <p className="pb-4 text-center text-xs text-muted-foreground">
+                Veriler Twelve Data API&apos;den alınmaktadır • 10 dakikada bir güncellenir
+              </p>
+            )}
+          </div>
+        </SwipeDeck>
       </main>
 
-      {!isViewer && (
+      {!readOnly && (
         <GoldAddSheet
           side={addSide}
           total={addSide ? portfolio.gold[addSide] : 0}
@@ -249,7 +294,7 @@ export default function Home() {
         />
       )}
 
-      {!isViewer && user && (
+      {!readOnly && user && (
         <ViewersPanel
           open={viewersOpen}
           onOpenChange={setViewersOpen}

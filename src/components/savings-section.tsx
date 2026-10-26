@@ -9,8 +9,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { Pencil, PiggyBank } from "lucide-react";
-import type { User } from "@supabase/supabase-js";
-import { useSavings } from "@/hooks/use-savings";
+import type { SavingEntry } from "@/lib/types";
 import { SavingsDrawer } from "@/components/savings-drawer";
 
 const SHORT_MONTHS = [
@@ -78,11 +77,13 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 interface SavingsSectionProps {
-  user: User | null;
+  entries: SavingEntry[];
+  totals: { sum: number; average: number };
+  isViewer: boolean;
+  onSave: (month: string, amount: number) => void;
 }
 
-export function SavingsSection({ user }: SavingsSectionProps) {
-  const { entries, setMonth, totals, isViewer } = useSavings(user);
+export function SavingsSection({ entries, totals, isViewer, onSave }: SavingsSectionProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editMonth, setEditMonth] = useState(currentMonthKey);
 
@@ -227,9 +228,7 @@ export function SavingsSection({ user }: SavingsSectionProps) {
           onOpenChange={setDrawerOpen}
           initialMonth={editMonth}
           entries={entries}
-          onSave={(month, amount) => {
-            setMonth(month, amount);
-          }}
+          onSave={onSave}
         />
       )}
     </>
