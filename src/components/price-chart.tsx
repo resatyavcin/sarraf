@@ -149,6 +149,7 @@ export function PriceChart({ title, data, color }: PriceChartProps) {
               }
             />
             <Area
+              isAnimationActive={false}
               type="monotone"
               dataKey="price"
               stroke={color}

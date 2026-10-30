@@ -181,7 +181,7 @@ export function GoldAddSheet({
           {entries.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Henüz ekleme yok.</p>
           ) : (
-            <ul className="max-h-80 divide-y overflow-y-auto">
+            <ul className="max-h-80 divide-y overflow-y-auto overscroll-y-contain">
               {entries.map((entry) => (
                 <li key={entry.id} className="flex items-center justify-between gap-3 py-3">
                   <div>

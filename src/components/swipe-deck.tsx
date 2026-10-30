@@ -2,6 +2,7 @@
 
 import {
   Children,
+  useEffect,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -11,6 +12,31 @@ import { cn } from "@/lib/utils";
 
 const SWIPE_START = 12;
 const SWIPE_COMMIT = 56;
+const FLICK = 0.11;
+
+function placeTrack(
+  el: HTMLDivElement | null,
+  page: number,
+  pages: number,
+  dx: number,
+  animate: boolean
+) {
+  if (!el || pages < 1) return;
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  el.style.willChange = animate ? "auto" : "transform";
+  el.style.transition = !animate || reduce ? "none" : "transform 200ms var(--ease-out)";
+  el.style.transform = `translate3d(calc(${-page} * 100% / ${pages} + ${dx}px), 0, 0)`;
+}
+
+type Sample = { x: number; t: number };
+type Origin = {
+  x: number;
+  y: number;
+  active: boolean;
+  horizontal: boolean;
+  pointerId: number;
+  samples: Sample[];
+};
 
 export function SwipeDeck({
   index,
@@ -23,31 +49,44 @@ export function SwipeDeck({
 }) {
   const slides = Children.toArray(children);
   const count = slides.length;
-  const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
-  const dragRef = useRef(0);
+  const trackRef = useRef<HTMLDivElement>(null);
   const suppressClick = useRef(false);
-  const origin = useRef<{ x: number; y: number; active: boolean; horizontal: boolean } | null>(null);
+  const origin = useRef<Origin | null>(null);
+  const draggingRef = useRef(false);
+  const seen = useRef(false);
 
-  function setDrag(value: number) {
-    dragRef.current = value;
-    setDragX(value);
-  }
+  useEffect(() => {
+    if (draggingRef.current) return;
+    placeTrack(trackRef.current, index, count, 0, seen.current);
+    seen.current = true;
+  }, [index, count]);
 
-  function rubber(dx: number) {
-    if (index <= 0 && dx > 0) return dx * 0.25;
-    if (index >= count - 1 && dx < 0) return dx * 0.25;
-    return dx;
+  function rubber(dx: number, width: number) {
+    const atStart = index <= 0 && dx > 0;
+    const atEnd = index >= count - 1 && dx < 0;
+    if (!atStart && !atEnd) return dx;
+    const dimension = width || 1;
+    const constant = 0.55;
+    return (dx * dimension * constant) / (dimension + constant * Math.abs(dx));
   }
 
   function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return;
-    origin.current = { x: event.clientX, y: event.clientY, active: true, horizontal: false };
+    if (origin.current?.active) return;
+    origin.current = {
+      x: event.clientX,
+      y: event.clientY,
+      active: true,
+      horizontal: false,
+      pointerId: event.pointerId,
+      samples: [{ x: event.clientX, t: event.timeStamp }],
+    };
   }
 
   function onPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
     const start = origin.current;
-    if (!start?.active) return;
+    if (!start?.active || start.pointerId !== event.pointerId) return;
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
     if (!start.horizontal) {
@@ -57,31 +96,46 @@ export function SwipeDeck({
         return;
       }
       start.horizontal = true;
+      draggingRef.current = true;
       setDragging(true);
       event.currentTarget.setPointerCapture(event.pointerId);
     }
-    setDrag(rubber(dx));
+    start.samples.push({ x: event.clientX, t: event.timeStamp });
+    if (start.samples.length > 5) start.samples.shift();
+    placeTrack(trackRef.current, index, count, rubber(dx, event.currentTarget.clientWidth), false);
   }
 
-  function finish() {
+  function finish(event: ReactPointerEvent<HTMLDivElement>) {
     const start = origin.current;
+    if (start && start.pointerId !== event.pointerId) return;
     origin.current = null;
+    draggingRef.current = false;
     if (start?.horizontal) {
       suppressClick.current = true;
       window.setTimeout(() => {
         suppressClick.current = false;
       }, 400);
-      const dx = dragRef.current;
-      if (
-        (dx <= -SWIPE_COMMIT && index < count - 1) ||
-        (dx >= SWIPE_COMMIT && index > 0)
-      ) {
+      const dx = event.clientX - start.x;
+      const samples = start.samples;
+      const first = samples[0];
+      const last = samples[samples.length - 1];
+      const dt = last && first ? last.t - first.t : 0;
+      const velocity = dt > 0 && last && first ? (last.x - first.x) / dt : 0;
+      const flickNext = velocity < -FLICK;
+      const flickPrev = velocity > FLICK;
+      const current = index;
+      const pages = count;
+      if ((dx <= -SWIPE_COMMIT || flickNext) && current < pages - 1) {
         if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-        onIndexChange(dx < 0 ? index + 1 : index - 1);
+        onIndexChange(current + 1);
+      } else if ((dx >= SWIPE_COMMIT || flickPrev) && current > 0) {
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+        onIndexChange(current - 1);
+      } else {
+        placeTrack(trackRef.current, index, count, 0, true);
       }
     }
     setDragging(false);
-    setDrag(0);
   }
 
   return (
@@ -99,14 +153,7 @@ export function SwipeDeck({
       onPointerUp={finish}
       onPointerCancel={finish}
     >
-      <div
-        className="flex items-start"
-        style={{
-          width: `${count * 100}%`,
-          transform: `translateX(calc(${-index} * 100% / ${count} + ${dragX}px))`,
-          transition: dragging ? "none" : "transform 280ms ease",
-        }}
-      >
+      <div ref={trackRef} className="flex items-start" style={{ width: `${count * 100}%` }}>
         {slides.map((slide, slideIndex) => {
           const hidden = !dragging && slideIndex !== index;
           return (

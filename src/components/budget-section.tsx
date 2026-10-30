@@ -5,12 +5,13 @@ import type { User } from "@supabase/supabase-js";
 import { Dialog } from "radix-ui";
 import { ChevronLeft, ChevronRight, Info, Plus, Settings, Trash2, Wallet, X } from "lucide-react";
 import { BudgetSettingsDrawer } from "@/components/budget-settings-drawer";
+import { FetchChecks } from "@/components/fetch-checks";
 import { MoneyPadSheet } from "@/components/money-pad";
 import { playTick } from "@/lib/play-tick";
 import { last12MonthKeys } from "@/hooks/use-savings";
 import { newBudgetId, useBudget } from "@/hooks/use-budget";
-import { computeMonthBudget } from "@/lib/budget";
-import type { BudgetBank } from "@/lib/types";
+import { categoryCoversMonth, computeMonthBudget } from "@/lib/budget";
+import type { BudgetCategory, BudgetEntry } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -48,11 +49,15 @@ function fmt(value: number) {
   });
 }
 
-const BANKS: { id: BudgetBank; name: string; logo: string }[] = [
-  { id: "garanti", name: "Garanti", logo: "/banks/garanti.svg" },
-  { id: "hadi", name: "Hadi", logo: "/banks/hadi.svg" },
-  { id: "enpara", name: "Enpara", logo: "/banks/enpara.svg" },
-  { id: "garanti-2", name: "Garanti 2", logo: "/banks/garanti.svg" },
+const CATEGORY_COLORS = [
+  "bg-blue-500",
+  "bg-emerald-500",
+  "bg-amber-400",
+  "bg-orange-500",
+  "bg-violet-500",
+  "bg-rose-500",
+  "bg-cyan-500",
+  "bg-lime-500",
 ];
 
 const WISH_KEY = "sarraf-budget-wish";
@@ -94,7 +99,7 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
   const [wishes, setWishes] = useState(loadWishes);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pad, setPad] = useState<"wish" | "expense" | null>(null);
-  const [bankPad, setBankPad] = useState<BudgetBank | null>(null);
+  const [statementPad, setStatementPad] = useState<string | null>(null);
   const activeMonth = months.includes(month) ? month : months[months.length - 1];
   const monthIndex = Math.max(0, months.indexOf(activeMonth));
 
@@ -103,12 +108,20 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
     fixedExpenses: budget.fixedExpenses,
     categories: budget.categories,
     entries: budget.entries,
-    statements: budget.statements,
     month: activeMonth,
     savingsAmount: wishes[activeMonth] ?? 0,
   });
-  const categories = budget.categories;
+  const categories = budget.categories.filter((category) => category.kind !== "statement");
+  const required = budget.categories.filter(
+    (category) => category.kind === "statement" && categoryCoversMonth(category, activeMonth)
+  );
   const selected = categories.find((category) => category.id === selectedId) ?? categories[0] ?? null;
+  const statementIds = new Set(required.map((category) => category.id));
+  const statementTotal = math.monthEntries
+    .filter((entry) => statementIds.has(entry.categoryId))
+    .reduce((sum, entry) => sum + entry.amount, 0);
+  const categoryEntries = math.monthEntries.filter((entry) => !statementIds.has(entry.categoryId));
+  const categoryExpenses = categoryEntries.reduce((sum, entry) => sum + entry.amount, 0);
   const wish = wishes[activeMonth] ?? 0;
 
   function setWish(amount: number) {
@@ -126,7 +139,21 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
     math.spendable > 0 ? Math.min(100, (math.expenses / math.spendable) * 100) : math.expenses > 0 ? 100 : 0;
 
   if (budget.loading) {
-    return <Skeleton className="h-80 rounded-2xl" />;
+    return (
+      <section className="rounded-2xl border bg-card p-5">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/15">
+            <Wallet className="h-5 w-5 text-sky-600" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-semibold">Aylık Bütçe</h2>
+            <p className="truncate text-xs text-muted-foreground">Gelir, gider, harcama</p>
+          </div>
+        </div>
+        <FetchChecks onRefetch={budget.refetch} />
+        <Skeleton className="mt-4 h-64 rounded-xl" />
+      </section>
+    );
   }
 
   return (
@@ -156,6 +183,8 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
           <Settings className="h-4 w-4" />
         </button>
       </div>
+
+      <FetchChecks onRefetch={budget.refetch} />
 
       <div className="mt-4 flex items-center justify-between">
         <button
@@ -215,45 +244,44 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
         </span>
       </button>
 
-      <div className="mt-6">
-        <BlockTitle title="Ekstre" hint="Kalan paradan düşer" total={math.statements} />
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          {BANKS.map((bank) => {
-            const amount =
-              budget.statements.find((item) => item.month === activeMonth && item.bank === bank.id)
-                ?.amount ?? 0;
-            return (
-              <button
-                key={bank.id}
-                type="button"
-                disabled={locked}
-                onClick={() => {
-                  playTick();
-                  setBankPad(bank.id);
-                }}
-                className="flex flex-col items-center gap-2 rounded-2xl border px-3 py-3 text-center disabled:opacity-70"
-              >
-                <img src={bank.logo} alt="" className="h-7 w-full object-contain" />
-                <span className="text-xs font-medium">{bank.name}</span>
-                <span
-                  className={cn(
-                    "text-xs tabular-nums",
-                    amount === 0 && "text-muted-foreground"
-                  )}
+      {required.length > 0 && (
+        <div className="mt-6">
+          <BlockTitle title="Ekstre" hint="Kalan paradan düşer" total={statementTotal} />
+          <div className="mt-3 space-y-2">
+            {required.map((category) => {
+              const saved = math.monthEntries.find((entry) => entry.categoryId === category.id);
+              return (
+                <button
+                  key={category.id}
+                  type="button"
+                  disabled={locked}
+                  onClick={() => {
+                    playTick();
+                    setStatementPad(category.id);
+                  }}
+                  className="flex h-11 w-full items-center justify-between rounded-xl border px-3 text-left disabled:opacity-70"
                 >
-                  {amount > 0 ? `${fmt(amount)} ₺` : "Tutar gir"}
-                </span>
-              </button>
-            );
-          })}
+                  <span className="min-w-0 truncate text-sm text-muted-foreground">{category.name}</span>
+                  <span
+                    className={cn(
+                      "shrink-0 text-sm font-medium tabular-nums",
+                      saved == null && "text-muted-foreground"
+                    )}
+                  >
+                    {saved != null ? `${fmt(saved.amount)} ₺` : "Tutar gir"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mt-6">
         <BlockTitle
           title="Giderler"
           hint="Harcanacak paradan düşer"
-          total={math.expenses}
+          total={categoryExpenses}
         />
         <div className="mt-3 flex flex-wrap gap-2">
           {categories.map((category) => {
@@ -307,7 +335,7 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
           onAdd={(name) => {
             playTick();
             const id = newBudgetId();
-            budget.saveCategory({ id, name, kind: "custom" });
+            budget.saveCategory({ id, name, kind: "custom", validFrom: null, validTo: null });
             setSelectedId(id);
           }}
         />
@@ -324,41 +352,16 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
             {selected ? `${selected.name} ekle` : "Önce kategori seç"}
           </button>
         )}
-        {math.monthEntries.length === 0 ? (
-          <p className="mt-4 text-sm text-muted-foreground">Bu ay henüz gider yok</p>
-        ) : (
-          <ul className="mt-2 divide-y">
-            {[...math.monthEntries].reverse().map((entry) => {
-              const category = categories.find((item) => item.id === entry.categoryId);
-              return (
-                <li key={entry.id} className="flex items-center gap-3 py-3">
-                  <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium">
-                    {category?.name ?? "Gider"}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-sm">
-                    {entry.label !== category?.name ? entry.label : ""}
-                  </span>
-                  <span className="shrink-0 text-sm font-medium tabular-nums">
-                    {fmt(entry.amount)} ₺
-                  </span>
-                  {!locked && (
-                    <button
-                      type="button"
-                      aria-label="Sil"
-                      onClick={() => {
-                        playTick();
-                        budget.deleteEntry(entry.id);
-                      }}
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <SpendBreakdown
+          categories={categories}
+          entries={categoryEntries}
+          total={categoryExpenses}
+          locked={locked}
+          onDelete={(id) => {
+            playTick();
+            budget.deleteEntry(id);
+          }}
+        />
       </div>
 
       <Dialog.Root open={infoOpen} onOpenChange={setInfoOpen}>
@@ -370,7 +373,7 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
               if (event.target === event.currentTarget) setInfoOpen(false);
             }}
           >
-            <div className="max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto rounded-2xl border bg-background p-5 shadow-xl">
+            <div className="max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto overscroll-y-contain rounded-2xl border bg-background p-5 shadow-xl">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <Dialog.Title className="text-base font-semibold">
                   {formatMonth(activeMonth)}
@@ -382,11 +385,11 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
               <div className="space-y-1">
                 <FlowLine label="Sabit gelir" value={math.income} />
                 <FlowLine label="Sabit gider" value={-math.fixed} />
-                <FlowLine label="Ekstre" value={-math.statements} />
                 <FlowLine label="Kalan para" value={math.remaining} strong />
                 <FlowLine label="Biriktirmek istediğim" value={-wish} />
                 <FlowLine label="Harcanacak" value={math.spendable} strong />
-                <FlowLine label="Giderler" value={-math.expenses} />
+                <FlowLine label="Ekstre" value={-statementTotal} />
+                <FlowLine label="Giderler" value={-categoryExpenses} />
               </div>
               {math.remaining < 0 && (
                 <p className="mt-3 text-xs text-red-600">Sabit gider, geliri aşıyor.</p>
@@ -414,6 +417,9 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
         onDeleteIncome={budget.deleteIncome}
         onSaveFixed={budget.saveFixed}
         onDeleteFixed={budget.deleteFixed}
+        categories={budget.categories}
+        onSaveCategory={budget.saveCategory}
+        onDeleteCategory={budget.deleteCategory}
       />
       <MoneyPadSheet
         open={pad === "wish"}
@@ -424,16 +430,26 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
         onConfirm={setWish}
       />
       <MoneyPadSheet
-        open={bankPad !== null}
-        title={BANKS.find((bank) => bank.id === bankPad)?.name ?? "Ekstre"}
-        hint="Kalan paradan düşer"
+        open={statementPad !== null}
+        title={budget.categories.find((category) => category.id === statementPad)?.name ?? "Ekstre"}
+        hint="Bu ay girilmesi zorunlu"
         allowZero
         onOpenChange={(open) => {
-          if (!open) setBankPad(null);
+          if (!open) setStatementPad(null);
         }}
         onConfirm={(amount) => {
-          if (!bankPad) return;
-          budget.saveStatement({ month: activeMonth, bank: bankPad, amount });
+          const category = budget.categories.find((item) => item.id === statementPad);
+          if (!category) return;
+          const existing = budget.entries.find(
+            (entry) => entry.categoryId === category.id && entry.month === activeMonth
+          );
+          budget.saveEntry({
+            id: existing?.id ?? newBudgetId(),
+            month: activeMonth,
+            categoryId: category.id,
+            label: category.name,
+            amount,
+          });
         }}
       />
       <MoneyPadSheet
@@ -460,10 +476,98 @@ function FlowLine({ label, value, strong }: { label: string; value: number; stro
   return (
     <div className={cn("flex items-center justify-between gap-3 py-1", strong && "font-semibold")}>
       <span className={cn("text-sm", !strong && "text-muted-foreground")}>{label}</span>
-      <span className={cn("text-sm tabular-nums", value < 0 && !strong && "text-muted-foreground")}>
+      <span
+        className={cn(
+          "text-sm tabular-nums",
+          value > 0 && "text-emerald-600 dark:text-emerald-400",
+          value < 0 && "text-red-600 dark:text-red-400"
+        )}
+      >
         {value < 0 ? "−" : ""}
         {fmt(Math.abs(value))} ₺
       </span>
+    </div>
+  );
+}
+
+function SpendBreakdown({
+  categories,
+  entries,
+  total,
+  locked,
+  onDelete,
+}: {
+  categories: BudgetCategory[];
+  entries: BudgetEntry[];
+  total: number;
+  locked: boolean;
+  onDelete: (id: string) => void;
+}) {
+  const slices = categories.flatMap((category, index) => {
+    const amount = entries
+      .filter((entry) => entry.categoryId === category.id)
+      .reduce((sum, entry) => sum + entry.amount, 0);
+    if (amount <= 0) return [];
+    return [{ category, amount, color: CATEGORY_COLORS[index % CATEGORY_COLORS.length] }];
+  });
+
+  if (entries.length === 0) {
+    return <p className="mt-4 text-sm text-muted-foreground">Bu ay henüz gider yok</p>;
+  }
+
+  return (
+    <div className="mt-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-xs text-muted-foreground">Toplam harcama</p>
+        <p className="text-sm font-semibold tabular-nums">{fmt(total)} ₺</p>
+      </div>
+      <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-muted">
+        {slices.map((slice) => (
+          <div
+            key={slice.category.id}
+            className={cn("h-full", slice.color)}
+            style={{ width: `${total > 0 ? (slice.amount / total) * 100 : 0}%` }}
+          />
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5">
+        {slices.map((slice) => (
+          <span key={slice.category.id} className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span className={cn("size-2 rounded-full", slice.color)} />
+            {slice.category.name}
+          </span>
+        ))}
+      </div>
+      <ul className="mt-2">
+        {[...entries].reverse().map((entry) => {
+          const category = categories.find((item) => item.id === entry.categoryId);
+          const title = entry.label.trim() || category?.name || "Gider";
+          return (
+            <li key={entry.id} className="flex items-center gap-3 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{title}</p>
+                <p className="truncate text-xs text-muted-foreground">{category?.name ?? "Gider"}</p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-sm font-medium tabular-nums text-red-600 dark:text-red-400">
+                  −{fmt(entry.amount)} ₺
+                </p>
+                <p className="text-[11px] text-muted-foreground">Gider</p>
+              </div>
+              {!locked && (
+                <button
+                  type="button"
+                  aria-label="Sil"
+                  onClick={() => onDelete(entry.id)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

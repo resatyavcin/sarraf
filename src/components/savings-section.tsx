@@ -197,6 +197,7 @@ export function SavingsSection({ entries, totals, isViewer, onSave }: SavingsSec
                 }
               />
               <Bar
+                isAnimationActive={false}
                 dataKey="amount"
                 radius={[4, 4, 0, 0]}
                 cursor={isViewer ? "default" : "pointer"}

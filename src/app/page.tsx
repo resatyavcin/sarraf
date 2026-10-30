@@ -60,7 +60,7 @@ export default function Home() {
 
   if (!authLoading && !user) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
+      <div className="flex min-h-dvh flex-col items-center justify-center bg-background px-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <img
           src="/icons/icon-192.png"
           alt="Sarraf"
@@ -88,8 +88,8 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg">
+    <div className="min-h-dvh bg-background">
+      <header className="app-chrome sticky top-0 z-50 bg-background/80 pt-[env(safe-area-inset-top)] backdrop-blur-lg">
         <div className="mx-auto flex h-14 max-w-lg items-center justify-between gap-2 px-4">
           <div className="flex min-w-0 items-center gap-2">
             <img
@@ -187,14 +187,14 @@ export default function Home() {
               ))}
             </div>
             <div
-              className="absolute bottom-0 left-0 h-0.5 w-1/3 bg-foreground transition-transform duration-300"
+              className="absolute bottom-0 left-0 h-0.5 w-1/3 bg-foreground transition-transform duration-200 ease-[var(--ease-out)] motion-reduce:transition-none"
               style={{ transform: `translateX(${page * 100}%)` }}
             />
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl py-6">
+      <main className="mx-auto max-w-4xl py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <SwipeDeck index={page} onIndexChange={setPage}>
           <BudgetSection user={user} readOnly={readOnly} />
           <div className="space-y-6">
@@ -365,7 +365,7 @@ function GoogleIcon() {
 
 function PageLoading() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-background">
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-background pt-[env(safe-area-inset-top)]">
       <img
         src="/icons/icon-192.png"
         alt="Sarraf"

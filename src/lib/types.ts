@@ -71,6 +71,8 @@ export interface BudgetCategory {
   id: string;
   name: string;
   kind: BudgetCategoryKind;
+  validFrom: string | null;
+  validTo: string | null;
 }
 
 export interface BudgetEntry {
@@ -81,18 +83,9 @@ export interface BudgetEntry {
   amount: number;
 }
 
-export type BudgetBank = "garanti" | "hadi" | "enpara" | "garanti-2";
-
-export interface BudgetStatement {
-  month: string;
-  bank: BudgetBank;
-  amount: number;
-}
-
 export interface BudgetSnapshot {
   incomes: BudgetItem[];
   fixedExpenses: BudgetItem[];
   categories: BudgetCategory[];
   entries: BudgetEntry[];
-  statements: BudgetStatement[];
 }

@@ -155,12 +155,11 @@ create table budget_categories (
   user_id uuid references auth.users(id) on delete cascade not null,
   name text not null check (char_length(btrim(name)) between 1 and 60),
   kind text not null default 'custom' check (kind in ('custom', 'statement')),
-  created_at timestamptz not null default now()
+  valid_from date,
+  valid_to date,
+  created_at timestamptz not null default now(),
+  check (valid_to is null or valid_from is null or valid_to >= valid_from)
 );
-
-create unique index budget_categories_one_statement
-  on budget_categories (user_id)
-  where kind = 'statement';
 
 create index budget_categories_user_idx on budget_categories (user_id, created_at);
 

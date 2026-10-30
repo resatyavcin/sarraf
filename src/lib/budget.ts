@@ -1,10 +1,4 @@
-import type { BudgetBank, BudgetCategory, BudgetEntry, BudgetItem, BudgetStatement } from "@/lib/types";
-
-export const BUDGET_BANKS = ["garanti", "hadi", "enpara", "garanti-2"] as const satisfies readonly BudgetBank[];
-
-export function isBudgetBank(value: unknown): value is BudgetBank {
-  return typeof value === "string" && (BUDGET_BANKS as readonly string[]).includes(value);
-}
+import type { BudgetCategory, BudgetEntry, BudgetItem } from "@/lib/types";
 
 function sumAmounts(items: { amount: number }[]) {
   return items.reduce((acc, item) => acc + (Number(item.amount) || 0), 0);
@@ -16,12 +10,18 @@ export function itemCoversMonth(item: BudgetItem, month: string) {
   return true;
 }
 
+export function categoryCoversMonth(category: BudgetCategory, month: string) {
+  if (category.kind !== "statement") return true;
+  if (!category.validFrom || category.validFrom > month) return false;
+  if (category.validTo && category.validTo < month) return false;
+  return true;
+}
+
 export function computeMonthBudget(input: {
   incomes: BudgetItem[];
   fixedExpenses: BudgetItem[];
   categories: BudgetCategory[];
   entries: BudgetEntry[];
-  statements: BudgetStatement[];
   month: string;
   savingsAmount: number;
 }) {
@@ -30,11 +30,8 @@ export function computeMonthBudget(input: {
   const fixed = sumAmounts(
     input.fixedExpenses.filter((item) => itemCoversMonth(item, input.month))
   );
-  const statements = sumAmounts(
-    input.statements.filter((item) => item.month === input.month)
-  );
   const expenses = sumAmounts(monthEntries);
-  const remaining = income - fixed - statements;
+  const remaining = income - fixed;
   const savings = Math.max(0, Number(input.savingsAmount) || 0);
   const spendable = remaining - savings;
   const left = spendable - expenses;
@@ -42,7 +39,6 @@ export function computeMonthBudget(input: {
   return {
     income,
     fixed,
-    statements,
     remaining,
     savings,
     spendable,

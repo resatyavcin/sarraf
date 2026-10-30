@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerSupabase, hasSupabaseConfig } from "@/lib/supabase-server";
 import { getAccountAccess } from "@/lib/account-access";
-import { isBudgetBank } from "@/lib/budget";
-import type { AccountRole, BudgetCategory, BudgetEntry, BudgetItem, BudgetStatement } from "@/lib/types";
+import type { AccountRole, BudgetItem } from "@/lib/types";
 
 const NO_STORE = { "Cache-Control": "private, no-store" };
 const UUID_RE =
@@ -55,7 +54,18 @@ function mapItem(row: {
   };
 }
 
-export async function GET() {
+const PARTS = ["incomes", "fixedExpenses", "categories", "entries"] as const;
+type BudgetPart = (typeof PARTS)[number];
+
+function isBudgetPart(value: string | null): value is BudgetPart {
+  return PARTS.some((part) => part === value);
+}
+
+export async function GET(request: Request) {
+  const requested = new URL(request.url).searchParams.get("part");
+  if (requested && !isBudgetPart(requested)) {
+    return NextResponse.json({ error: "Invalid part" }, { status: 400, headers: NO_STORE });
+  }
   if (!hasSupabaseConfig()) {
     return NextResponse.json(
       {
@@ -64,7 +74,6 @@ export async function GET() {
         fixedExpenses: [],
         categories: [],
         entries: [],
-        statements: [],
       },
       { status: 503, headers: NO_STORE }
     );
@@ -82,75 +91,77 @@ export async function GET() {
 
   const access = await getAccountAccess(supabase, user);
 
-  const [incomes, fixedExpenses, categories, entries, statements] = await Promise.all([
-    supabase
-      .from("budget_incomes")
-      .select("id, name, amount, valid_from, valid_to")
-      .eq("user_id", access.ownerId)
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("budget_fixed_expenses")
-      .select("id, name, amount, valid_from, valid_to")
-      .eq("user_id", access.ownerId)
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("budget_categories")
-      .select("id, name, kind")
-      .eq("user_id", access.ownerId)
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("budget_entries")
-      .select("id, month, category_id, label, amount")
-      .eq("user_id", access.ownerId)
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("budget_statements")
-      .select("month, bank, amount")
-      .eq("user_id", access.ownerId),
+  const ownerId = access.ownerId;
+  const wanted = (part: BudgetPart) => !requested || requested === part;
+  const [incomes, fixedExpenses, categories, entries] = await Promise.all([
+    wanted("incomes")
+      ? supabase
+          .from("budget_incomes")
+          .select("id, name, amount, valid_from, valid_to")
+          .eq("user_id", ownerId)
+          .order("created_at", { ascending: true })
+      : null,
+    wanted("fixedExpenses")
+      ? supabase
+          .from("budget_fixed_expenses")
+          .select("id, name, amount, valid_from, valid_to")
+          .eq("user_id", ownerId)
+          .order("created_at", { ascending: true })
+      : null,
+    wanted("categories")
+      ? supabase
+          .from("budget_categories")
+          .select("id, name, kind, valid_from, valid_to")
+          .eq("user_id", ownerId)
+          .order("created_at", { ascending: true })
+      : null,
+    wanted("entries")
+      ? supabase
+          .from("budget_entries")
+          .select("id, month, category_id, label, amount")
+          .eq("user_id", ownerId)
+          .order("created_at", { ascending: true })
+      : null,
   ]);
 
-  const error =
-    incomes.error || fixedExpenses.error || categories.error || entries.error || statements.error;
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE });
+  const body: Record<string, unknown> = { access: access.role, fetched: {} };
+  const fetched = body.fetched as Record<BudgetPart, boolean>;
+
+  if (incomes) {
+    fetched.incomes = !incomes.error;
+    body.incomes = incomes.error ? [] : (incomes.data ?? []).map((row) => mapItem(row));
   }
-
-  const incomeRows: BudgetItem[] = (incomes.data ?? []).map((row) => mapItem(row));
-  const fixedRows: BudgetItem[] = (fixedExpenses.data ?? []).map((row) => mapItem(row));
-  const categoryRows: BudgetCategory[] = (categories.data ?? []).map((row) => ({
-    id: String(row.id),
-    name: String(row.name),
-    kind: row.kind === "statement" ? "statement" : "custom",
-  }));
-  const entryRows: BudgetEntry[] = (entries.data ?? []).map((row) => ({
-    id: String(row.id),
-    month: dbDateToMonth(String(row.month)),
-    categoryId: String(row.category_id),
-    label: String(row.label),
-    amount: Number(row.amount) || 0,
-  }));
-  const statementRows: BudgetStatement[] = (statements.data ?? []).flatMap((row) => {
-    if (!isBudgetBank(row.bank)) return [];
-    return [
-      {
-        month: dbDateToMonth(String(row.month)),
-        bank: row.bank,
-        amount: Number(row.amount) || 0,
-      },
-    ];
-  });
-
-  return NextResponse.json(
-    {
-      access: access.role,
-      incomes: incomeRows,
-      fixedExpenses: fixedRows,
-      categories: categoryRows,
-      entries: entryRows,
-      statements: statementRows,
-    },
-    { headers: NO_STORE }
-  );
+  if (fixedExpenses) {
+    fetched.fixedExpenses = !fixedExpenses.error;
+    body.fixedExpenses = fixedExpenses.error
+      ? []
+      : (fixedExpenses.data ?? []).map((row) => mapItem(row));
+  }
+  if (categories) {
+    fetched.categories = !categories.error;
+    body.categories = categories.error
+      ? []
+      : (categories.data ?? []).map((row) => ({
+          id: String(row.id),
+          name: String(row.name),
+          kind: row.kind === "statement" ? "statement" : "custom",
+          validFrom: row.valid_from ? dbDateToMonth(String(row.valid_from)) : null,
+          validTo: row.valid_to ? dbDateToMonth(String(row.valid_to)) : null,
+        }));
+  }
+  if (entries) {
+    fetched.entries = !entries.error;
+    body.entries = entries.error
+      ? []
+      : (entries.data ?? []).map((row) => ({
+          id: String(row.id),
+          month: dbDateToMonth(String(row.month)),
+          categoryId: String(row.category_id),
+          label: String(row.label),
+          amount: Number(row.amount) || 0,
+        }));
+  }
+  return NextResponse.json(body, { headers: NO_STORE });
 }
 
 export async function PUT(request: Request) {
@@ -254,11 +265,27 @@ export async function PUT(request: Request) {
 
   if (op === "save-category") {
     const name = cleanName(body.name, 60);
-    if (!id || !name) {
+    const kind = body.kind === "statement" ? "statement" : "custom";
+    const validFrom = body.validFrom == null || body.validFrom === "" ? null : cleanMonth(body.validFrom);
+    const validTo = body.validTo == null || body.validTo === "" ? null : cleanMonth(body.validTo);
+    if (!id || !name || (kind === "statement" && !validFrom)) {
       return NextResponse.json({ error: "Invalid category" }, { status: 400, headers: NO_STORE });
     }
+    if ((body.validFrom && !validFrom) || (body.validTo && !validTo)) {
+      return NextResponse.json({ error: "Invalid range" }, { status: 400, headers: NO_STORE });
+    }
+    if (validFrom && validTo && validTo < validFrom) {
+      return NextResponse.json({ error: "Invalid range" }, { status: 400, headers: NO_STORE });
+    }
     const { error } = await supabase.from("budget_categories").upsert(
-      { id, user_id: user.id, name, kind: "custom" },
+      {
+        id,
+        user_id: user.id,
+        name,
+        kind,
+        valid_from: validFrom ? monthToDbDate(validFrom) : null,
+        valid_to: validTo ? monthToDbDate(validTo) : null,
+      },
       { onConflict: "id" }
     );
     if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE });
@@ -301,39 +328,6 @@ export async function PUT(request: Request) {
     );
     if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE });
     return NextResponse.json({ ok: true, categoryId }, { headers: NO_STORE });
-  }
-
-  if (op === "save-statement" || op === "delete-statement") {
-    const month = cleanMonth(body.month);
-    const bank = isBudgetBank(body.bank) ? body.bank : null;
-    if (!month || !bank) {
-      return NextResponse.json({ error: "Invalid statement" }, { status: 400, headers: NO_STORE });
-    }
-    if (op === "delete-statement") {
-      const { error } = await supabase
-        .from("budget_statements")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("month", monthToDbDate(month))
-        .eq("bank", bank);
-      if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE });
-      return NextResponse.json({ ok: true }, { headers: NO_STORE });
-    }
-    const amount = cleanAmount(body.amount);
-    if (amount === null || amount <= 0) {
-      return NextResponse.json({ error: "Invalid statement" }, { status: 400, headers: NO_STORE });
-    }
-    const { error } = await supabase.from("budget_statements").upsert(
-      {
-        user_id: user.id,
-        month: monthToDbDate(month),
-        bank,
-        amount,
-      },
-      { onConflict: "user_id,month,bank" }
-    );
-    if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE });
-    return NextResponse.json({ ok: true }, { headers: NO_STORE });
   }
 
   return NextResponse.json({ error: "Unknown op" }, { status: 400, headers: NO_STORE });
