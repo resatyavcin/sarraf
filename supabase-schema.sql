@@ -170,6 +170,7 @@ create table budget_entries (
   category_id uuid references budget_categories(id) on delete cascade not null,
   label text not null check (char_length(btrim(label)) between 1 and 80),
   amount numeric not null default 0 check (amount >= 0),
+  spent_on date,
   created_at timestamptz not null default now()
 );
 

@@ -112,6 +112,7 @@ function asEntry(value: unknown): BudgetEntry | null {
     categoryId?: unknown;
     label?: unknown;
     amount?: unknown;
+    spentOn?: unknown;
   };
   if (
     typeof row.id !== "string" ||
@@ -123,12 +124,15 @@ function asEntry(value: unknown): BudgetEntry | null {
   }
   const amount = Number(row.amount);
   if (!Number.isFinite(amount)) return null;
+  const spentOn =
+    typeof row.spentOn === "string" && /^\d{4}-\d{2}-\d{2}$/.test(row.spentOn) ? row.spentOn : null;
   return {
     id: row.id,
     month: row.month.slice(0, 7),
     categoryId: row.categoryId,
     label: row.label,
     amount: Math.max(0, amount),
+    spentOn,
   };
 }
 

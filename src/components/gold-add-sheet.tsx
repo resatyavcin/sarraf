@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 import { Dialog } from "radix-ui";
-import { Check, Delete, History, Undo2, X } from "lucide-react";
+import { History, Undo2, X } from "lucide-react";
 import type { GoldLedgerEntry, GoldSide } from "@/hooks/use-gold-ledger";
+import { AmountPad } from "@/components/money-pad";
 import { playTick } from "@/lib/play-tick";
-
-const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "back"] as const;
 
 function gramsLabel(n: number) {
   return n.toLocaleString("tr-TR", { maximumFractionDigits: 2 });
@@ -120,39 +119,9 @@ export function GoldAddSheet({
             </div>
           </div>
 
-          <p className="text-center text-4xl font-semibold tracking-tight tabular-nums">
-            {raw || "0"}
-            <span className="ml-1 text-base font-normal text-muted-foreground">gr</span>
-          </p>
-
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            {KEYS.map((key) => (
-              <button
-                key={key}
-                type="button"
-                onPointerDown={(event) => {
-                  press(key);
-                  event.preventDefault();
-                }}
-                className="flex h-14 items-center justify-center rounded-2xl bg-muted text-xl font-medium tabular-nums active:bg-muted/70"
-              >
-                {key === "back" ? <Delete className="h-5 w-5" /> : key}
-              </button>
-            ))}
+          <div className="mt-2">
+            <AmountPad raw={raw} unit="gr" canConfirm={canAdd} onKey={press} onConfirm={submit} />
           </div>
-
-          <button
-            type="button"
-            disabled={!canAdd}
-            onPointerDown={(event) => {
-              submit();
-              event.preventDefault();
-            }}
-            aria-label="Ekle"
-            className="mt-2 flex h-12 w-full items-center justify-center rounded-2xl bg-primary text-primary-foreground disabled:opacity-40"
-          >
-            <Check className="h-5 w-5" />
-          </button>
 
           <Dialog.Description className="sr-only">
             {title} gram gir

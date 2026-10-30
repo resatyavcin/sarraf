@@ -118,7 +118,7 @@ export async function GET(request: Request) {
     wanted("entries")
       ? supabase
           .from("budget_entries")
-          .select("id, month, category_id, label, amount")
+          .select("id, month, category_id, label, amount, spent_on")
           .eq("user_id", ownerId)
           .order("created_at", { ascending: true })
       : null,
@@ -159,6 +159,7 @@ export async function GET(request: Request) {
           categoryId: String(row.category_id),
           label: String(row.label),
           amount: Number(row.amount) || 0,
+          spentOn: row.spent_on ? String(row.spent_on).slice(0, 10) : null,
         }));
   }
   return NextResponse.json(body, { headers: NO_STORE });
@@ -297,6 +298,8 @@ export async function PUT(request: Request) {
     const amount = cleanAmount(body.amount);
     const month = cleanMonth(body.month);
     const categoryId = cleanId(body.categoryId);
+    const spentOn =
+      typeof body.spentOn === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.spentOn) ? body.spentOn : null;
     if (!id || !label || amount === null || !month) {
       return NextResponse.json({ error: "Invalid entry" }, { status: 400, headers: NO_STORE });
     }
@@ -314,6 +317,9 @@ export async function PUT(request: Request) {
     if (!category) {
       return NextResponse.json({ error: "Invalid category" }, { status: 400, headers: NO_STORE });
     }
+    if (spentOn && !spentOn.startsWith(`${month}-`)) {
+      return NextResponse.json({ error: "Invalid date" }, { status: 400, headers: NO_STORE });
+    }
 
     const { error } = await supabase.from("budget_entries").upsert(
       {
@@ -323,6 +329,7 @@ export async function PUT(request: Request) {
         category_id: categoryId,
         label,
         amount,
+        spent_on: spentOn,
       },
       { onConflict: "id" }
     );

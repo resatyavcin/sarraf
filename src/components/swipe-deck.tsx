@@ -74,6 +74,7 @@ export function SwipeDeck({
   function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return;
     if (origin.current?.active) return;
+    if (event.target instanceof Element && event.target.closest("[data-row-swipe]")) return;
     origin.current = {
       x: event.clientX,
       y: event.clientY,

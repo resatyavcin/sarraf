@@ -81,6 +81,7 @@ export interface BudgetEntry {
   categoryId: string;
   label: string;
   amount: number;
+  spentOn: string | null;
 }
 
 export interface BudgetSnapshot {
