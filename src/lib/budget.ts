@@ -1,4 +1,14 @@
 import type { BudgetCategory, BudgetEntry, BudgetItem } from "@/lib/types";
+import { budgetPeriodForDate, shiftBudgetMonth } from "@/lib/budget-period";
+
+export function entryBudgetPeriod(entry: BudgetEntry, categories: BudgetCategory[] = []) {
+  if (entry.spentOn) return budgetPeriodForDate(entry.spentOn);
+  // Legacy statements store the calendar month in which the period starts.
+  const isStatement = categories.some(
+    (category) => category.id === entry.categoryId && category.kind === "statement"
+  );
+  return isStatement ? shiftBudgetMonth(entry.month, 1) : entry.month;
+}
 
 function sumAmounts(items: { amount: number }[]) {
   return items.reduce((acc, item) => acc + (Number(item.amount) || 0), 0);
@@ -25,7 +35,9 @@ export function computeMonthBudget(input: {
   month: string;
   savingsAmount: number;
 }) {
-  const monthEntries = input.entries.filter((entry) => entry.month === input.month);
+  const monthEntries = input.entries.filter(
+    (entry) => entryBudgetPeriod(entry, input.categories) === input.month
+  );
   const income = sumAmounts(input.incomes.filter((item) => itemCoversMonth(item, input.month)));
   const fixed = sumAmounts(
     input.fixedExpenses.filter((item) => itemCoversMonth(item, input.month))

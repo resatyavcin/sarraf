@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createServerSupabase, hasSupabaseConfig } from "@/lib/supabase-server";
 import { getAccountAccess } from "@/lib/account-access";
 import type { AccountRole, BudgetItem } from "@/lib/types";
+import { budgetPeriodBounds } from "@/lib/budget-period";
 
 const NO_STORE = { "Cache-Control": "private, no-store" };
 const UUID_RE =
@@ -317,7 +318,8 @@ export async function PUT(request: Request) {
     if (!category) {
       return NextResponse.json({ error: "Invalid category" }, { status: 400, headers: NO_STORE });
     }
-    if (spentOn && !spentOn.startsWith(`${month}-`)) {
+    const bounds = budgetPeriodBounds(month);
+    if (spentOn && (spentOn < bounds.min || spentOn > bounds.max)) {
       return NextResponse.json({ error: "Invalid date" }, { status: 400, headers: NO_STORE });
     }
 

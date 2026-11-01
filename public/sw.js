@@ -1,5 +1,4 @@
-const CACHE_NAME = "sarraf-v3";
-const API_CACHE_NAME = "sarraf-api-v3";
+const CACHE_NAME = "sarraf-v5";
 
 const STATIC_ASSETS = ["/", "/manifest.json"];
 
@@ -15,7 +14,7 @@ self.addEventListener("activate", (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((k) => k !== CACHE_NAME && k !== API_CACHE_NAME)
+          .filter((k) => k.startsWith("sarraf-") && k !== CACHE_NAME)
           .map((k) => caches.delete(k))
       )
     )
@@ -30,19 +29,8 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Auth and user data must never be served stale.
-  if (
-    url.pathname.startsWith("/api/auth") ||
-    url.pathname.startsWith("/auth/") ||
-    url.pathname.startsWith("/api/portfolio") ||
-    url.pathname.startsWith("/api/savings") ||
-    url.pathname.startsWith("/api/viewers")
-  ) {
-    return;
-  }
-
-  if (url.pathname.startsWith("/api/market")) {
-    event.respondWith(networkFirstStrategy(event.request));
+  // Never cache API responses, including future endpoints.
+  if (url.pathname === "/api" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/auth/")) {
     return;
   }
 
@@ -50,24 +38,6 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(staleWhileRevalidate(event.request));
   }
 });
-
-async function networkFirstStrategy(request) {
-  const cache = await caches.open(API_CACHE_NAME);
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      cache.put(request, response.clone());
-    }
-    return response;
-  } catch {
-    const cached = await cache.match(request);
-    if (cached) return cached;
-    return new Response(JSON.stringify({ error: "Offline" }), {
-      status: 503,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-}
 
 async function staleWhileRevalidate(request) {
   const cache = await caches.open(CACHE_NAME);

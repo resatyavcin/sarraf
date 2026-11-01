@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Dialog } from "radix-ui";
 import { Check, Delete, X } from "lucide-react";
 import { playTick } from "@/lib/play-tick";
@@ -46,42 +46,15 @@ function CommitButton({
   className: string;
   children: ReactNode;
 }) {
-  const handled = useRef(false);
-
   return (
     <button
       type="button"
       disabled={disabled}
-      onPointerDown={(event) => {
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }}
-      onPointerUp={(event) => {
-        if (!releasedInside(event)) return;
-        handled.current = true;
-        onConfirm();
-        requestAnimationFrame(() => {
-          handled.current = false;
-        });
-      }}
-      onClick={() => {
-        if (handled.current) return;
-        onConfirm();
-      }}
+      onClick={onConfirm}
       className={className}
     >
       {children}
     </button>
-  );
-}
-
-function releasedInside(event: ReactPointerEvent<HTMLButtonElement>) {
-  const rect = event.currentTarget.getBoundingClientRect();
-  const slop = 10;
-  return (
-    event.clientX >= rect.left - slop &&
-    event.clientX <= rect.right + slop &&
-    event.clientY >= rect.top - slop &&
-    event.clientY <= rect.bottom + slop
   );
 }
 
@@ -98,7 +71,6 @@ function PadKey({
 }) {
   const held = useRef(false);
   const repeated = useRef(false);
-  const handled = useRef(false);
   const startTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const repeatTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -110,11 +82,14 @@ function PadKey({
     repeatTimer.current = null;
   }
 
+  useEffect(() => stop, []);
+
   return (
     <button
       type="button"
       aria-label={label}
       onPointerDown={(event) => {
+        if (event.button !== 0 || !event.isPrimary || held.current) return;
         held.current = true;
         repeated.current = false;
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -128,19 +103,15 @@ function PadKey({
           }, 80);
         }, 380);
       }}
-      onPointerUp={(event) => {
-        const shouldCommit = held.current && !repeated.current && releasedInside(event);
+      onPointerUp={stop}
+      onPointerCancel={() => {
+        repeated.current = true;
         stop();
-        if (!shouldCommit) return;
-        handled.current = true;
-        onPress();
-        requestAnimationFrame(() => {
-          handled.current = false;
-        });
       }}
-      onPointerCancel={stop}
-      onClick={() => {
-        if (handled.current) return;
+      onLostPointerCapture={stop}
+      onClick={(event) => {
+        // A held delete key already fired; the release click must not delete again.
+        if (event.detail > 0 && repeated.current) return;
         onPress();
       }}
       className="flex h-14 items-center justify-center rounded-2xl bg-muted text-[1.375rem] font-medium tabular-nums text-foreground active:bg-foreground/10"

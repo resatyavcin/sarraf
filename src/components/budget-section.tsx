@@ -8,9 +8,9 @@ import { BudgetSettingsDrawer } from "@/components/budget-settings-drawer";
 import { FetchChecks } from "@/components/fetch-checks";
 import { MoneyPadSheet } from "@/components/money-pad";
 import { playTick } from "@/lib/play-tick";
-import { last12MonthKeys } from "@/hooks/use-savings";
+import { budgetPeriodBounds, budgetToday, currentBudgetPeriod, last12BudgetPeriods, shiftBudgetMonth } from "@/lib/budget-period";
 import { newBudgetId, useBudget } from "@/hooks/use-budget";
-import { categoryCoversMonth, computeMonthBudget } from "@/lib/budget";
+import { categoryCoversMonth, computeMonthBudget, entryBudgetPeriod } from "@/lib/budget";
 import type { BudgetCategory, BudgetEntry } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -29,11 +29,6 @@ const MONTHS = [
   "Kasım",
   "Aralık",
 ];
-
-function currentMonthKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
 
 const SHORT_MONTHS = [
   "Oca",
@@ -55,19 +50,9 @@ function formatMonth(month: string) {
   return `${MONTHS[(monthIndex ?? 1) - 1]} ${year}`;
 }
 
-function monthDateBounds(month: string) {
-  const [year, monthIndex] = month.split("-").map(Number);
-  const last = new Date(year, monthIndex, 0).getDate();
-  return {
-    min: `${month}-01`,
-    max: `${month}-${String(last).padStart(2, "0")}`,
-  };
-}
-
 function defaultSpentOn(month: string) {
-  const now = new Date();
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  const { min, max } = monthDateBounds(month);
+  const today = budgetToday();
+  const { min, max } = budgetPeriodBounds(month);
   if (today >= min && today <= max) return today;
   return max;
 }
@@ -98,19 +83,22 @@ const CATEGORY_COLORS = [
   "bg-lime-500",
 ];
 
-const WISH_KEY = "sarraf-budget-wish";
+const WISH_KEY = "sarraf-budget-wish-period-v1";
+const LEGACY_WISH_KEY = "sarraf-budget-wish";
 
 function loadWishes(): Record<string, number> {
   if (typeof window === "undefined") return {};
   try {
-    const raw = localStorage.getItem(WISH_KEY);
+    const current = localStorage.getItem(WISH_KEY);
+    const isLegacy = current === null;
+    const raw = current ?? localStorage.getItem(LEGACY_WISH_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     const next: Record<string, number> = {};
     for (const [month, amount] of Object.entries(parsed)) {
       const value = Number(amount);
-      if (/^\d{4}-\d{2}$/.test(month) && Number.isFinite(value) && value >= 0) {
-        next[month] = value;
+      if (/^\d{4}-(0[1-9]|1[0-2])$/.test(month) && Number.isFinite(value) && value >= 0) {
+        next[isLegacy ? shiftBudgetMonth(month, 1) : month] = value;
       }
     }
     return next;
@@ -125,8 +113,8 @@ interface BudgetSectionProps {
 }
 
 export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
-  const months = useMemo(() => last12MonthKeys(), []);
-  const [month, setMonth] = useState(currentMonthKey);
+  const months = useMemo(() => last12BudgetPeriods(), []);
+  const [month, setMonth] = useState(currentBudgetPeriod);
   const budget = useBudget(user);
   const locked = readOnly || budget.isViewer;
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -162,6 +150,9 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
   const categoryEntries = math.monthEntries.filter((entry) => !statementIds.has(entry.categoryId));
   const categoryExpenses = categoryEntries.reduce((sum, entry) => sum + entry.amount, 0);
   const wish = wishes[activeMonth] ?? 0;
+  const latestRecordedMonth = months.findLast((key) =>
+    budget.entries.some((entry) => entryBudgetPeriod(entry, budget.categories) === key)
+  );
 
   const confirmReady = confirmText.trim().toLocaleLowerCase("tr") === "onaylıyorum";
 
@@ -257,7 +248,12 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <p className="text-sm font-medium">{formatMonth(activeMonth)}</p>
+        <div className="text-center">
+          <p className="text-sm font-medium">{formatMonth(activeMonth)}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            24 {MONTHS[Number(shiftBudgetMonth(activeMonth, -1).slice(5, 7)) - 1]} – 24 {MONTHS[Number(activeMonth.slice(5, 7)) - 1]} öncesi
+          </p>
+        </div>
         <button
           type="button"
           aria-label="Sonraki ay"
@@ -268,6 +264,21 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
+
+      {math.monthEntries.length === 0 && (
+        <div className="mt-4 rounded-xl bg-muted/50 px-3 py-3 text-center text-sm text-muted-foreground">
+          <p>Bu ay için henüz harcama veya ekstre tutarı kaydedilmemiş.</p>
+          {latestRecordedMonth && latestRecordedMonth !== activeMonth && (
+            <button
+              type="button"
+              onClick={() => setMonth(latestRecordedMonth)}
+              className="mt-2 min-h-11 px-3 font-medium text-foreground underline underline-offset-4"
+            >
+              {formatMonth(latestRecordedMonth)} kayıtlarını göster
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="mt-4 text-center">
         <p className="text-xs font-medium text-muted-foreground">Kalan</p>
@@ -593,8 +604,8 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
         onConfirm={(amount) => {
           const category = budget.categories.find((item) => item.id === statementPad);
           if (!category) return;
-          const existing = budget.entries.find(
-            (entry) => entry.categoryId === category.id && entry.month === activeMonth
+          const existing = math.monthEntries.find(
+            (entry) => entry.categoryId === category.id
           );
           budget.saveEntry({
             id: existing?.id ?? newBudgetId(),
@@ -602,21 +613,22 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
             categoryId: category.id,
             label: category.name,
             amount,
-            spentOn: null,
+            spentOn: budgetPeriodBounds(activeMonth).min,
           });
         }}
       />
       <MoneyPadSheet
+        key={`expense-${activeMonth}`}
         open={pad === "expense"}
         title={selected?.name ?? "Gider"}
         onOpenChange={(open) => setPad(open ? "expense" : null)}
         namePlaceholder="İşlem adı"
         defaultDate={defaultSpentOn(activeMonth)}
-        dateMin={monthDateBounds(activeMonth).min}
-        dateMax={monthDateBounds(activeMonth).max}
+        dateMin={budgetPeriodBounds(activeMonth).min}
+        dateMax={budgetPeriodBounds(activeMonth).max}
         onConfirm={(amount, name, spentOn) => {
           if (!selected || amount <= 0) return;
-          const bounds = monthDateBounds(activeMonth);
+          const bounds = budgetPeriodBounds(activeMonth);
           const date = spentOn >= bounds.min && spentOn <= bounds.max ? spentOn : bounds.max;
           budget.saveEntry({
             id: newBudgetId(),
