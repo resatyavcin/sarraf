@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Dialog } from "radix-ui";
 import { History, Undo2, X } from "lucide-react";
 import type { GoldLedgerEntry, GoldSide } from "@/hooks/use-gold-ledger";
@@ -50,9 +50,12 @@ export function GoldAddSheet({
   total: number;
   entries: GoldLedgerEntry[];
   onOpenChange: (open: boolean) => void;
-  onAdd: (side: GoldSide, grams: number) => void;
-  onUndo: (entry: GoldLedgerEntry) => void;
+  onAdd: (side: GoldSide, grams: number) => Promise<void>;
+  onUndo: (entry: GoldLedgerEntry) => Promise<void>;
 }) {
+  const busy = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [raw, setRaw] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const open = side !== null;
@@ -61,15 +64,26 @@ export function GoldAddSheet({
   const canAdd = Number.isFinite(grams) && grams > 0;
 
   function press(key: string) {
+    if (busy.current) return;
     playTick();
     setRaw((prev) => typeKey(prev, key));
   }
 
-  function submit() {
-    if (!side || !canAdd) return;
+  async function submit() {
+    if (!side || !canAdd || busy.current) return;
+    busy.current = true; setSaving(true); setError("");
     playTick();
-    onAdd(side, Math.round(grams * 100) / 100);
-    setRaw("");
+    try { await onAdd(side, Math.round(grams * 100) / 100); setRaw(""); }
+    catch { setError("Kaydedilemedi. Bağlantını kontrol edip tekrar dene."); }
+    finally { busy.current = false; setSaving(false); }
+  }
+
+  async function undo(entry: GoldLedgerEntry) {
+    if (busy.current) return;
+    busy.current = true; setSaving(true); setError("");
+    try { await onUndo(entry); }
+    catch { setError("Geri alınamadı. Tekrar dene."); }
+    finally { busy.current = false; setSaving(false); }
   }
 
   return (
@@ -77,7 +91,9 @@ export function GoldAddSheet({
     <Dialog.Root
       open={open}
       onOpenChange={(next) => {
+        if (busy.current) return;
         if (!next) {
+          setError("");
           setRaw("");
           setHistoryOpen(false);
         }
@@ -120,9 +136,10 @@ export function GoldAddSheet({
           </div>
 
           <div className="mt-2">
-            <AmountPad raw={raw} unit="gr" canConfirm={canAdd} onKey={press} onConfirm={submit} />
+            <AmountPad raw={raw} unit="gr" canConfirm={canAdd && !saving} onKey={press} onConfirm={submit} />
           </div>
 
+          {error && <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>}
           <Dialog.Description className="sr-only">
             {title} gram gir
           </Dialog.Description>
@@ -130,7 +147,7 @@ export function GoldAddSheet({
       </Dialog.Portal>
     </Dialog.Root>
 
-    <Dialog.Root open={historyOpen} onOpenChange={setHistoryOpen}>
+    <Dialog.Root open={historyOpen} onOpenChange={(next) => { if (!busy.current) setHistoryOpen(next); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/50 duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0" />
         <Dialog.Content
@@ -161,8 +178,9 @@ export function GoldAddSheet({
                     type="button"
                     onClick={() => {
                       playTick();
-                      onUndo(entry);
+                      void undo(entry);
                     }}
+                    disabled={saving}
                     aria-label="Geri al"
                     className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
                   >
@@ -172,6 +190,7 @@ export function GoldAddSheet({
               ))}
             </ul>
           )}
+          {error && <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>}
           <Dialog.Description className="sr-only">
             {title} için son gram girişlerini geri al
           </Dialog.Description>

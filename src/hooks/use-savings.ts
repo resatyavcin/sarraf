@@ -121,27 +121,24 @@ export function useSavings(user: User | null) {
     if (accessRef.current === "viewer") return;
 
     const nextAmount = Math.max(0, Number(amount) || 0);
+    if (!Number.isFinite(nextAmount)) throw new Error("Geçersiz tutar");
+
+    if (userRef.current) {
+      const response = await fetch("/api/savings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ month, amount: nextAmount }),
+      });
+      if (!response.ok) throw new Error("Birikim kaydedilemedi");
+    }
+
     setEntries((prev) => {
       const filled = fillLast12(
-        prev.map((e) =>
-          e.month === month ? { month, amount: nextAmount } : e
-        )
+        prev.map((entry) => entry.month === month ? { month, amount: nextAmount } : entry)
       );
       saveLocal(filled);
       return filled;
     });
-
-    if (userRef.current) {
-      try {
-        await fetch("/api/savings", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ month, amount: nextAmount }),
-        });
-      } catch {
-        /* ignore */
-      }
-    }
   }, []);
 
   const totals = useMemo(() => {

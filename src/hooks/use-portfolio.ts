@@ -36,17 +36,6 @@ function saveLocal(p: Portfolio) {
   }
 }
 
-function isEmpty(p: Portfolio) {
-  return (
-    p.gold.physical === 0 &&
-    p.gold.digital === 0 &&
-    p.usd.physical === 0 &&
-    p.usd.digital === 0 &&
-    p.eur.physical === 0 &&
-    p.eur.digital === 0
-  );
-}
-
 function parsePortfolio(data: Record<string, unknown>): Portfolio {
   return {
     gold: {
@@ -66,6 +55,9 @@ function parsePortfolio(data: Record<string, unknown>): Portfolio {
 
 export function usePortfolio(user: User | null) {
   const [portfolio, setPortfolio] = useState<Portfolio>(loadLocal);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const writingRef = useRef(false);
   const [access, setAccess] = useState<AccountRole>("owner");
   const userRef = useRef<User | null>(null);
   const accessRef = useRef<AccountRole>("owner");
@@ -76,15 +68,19 @@ export function usePortfolio(user: User | null) {
       accessRef.current = "owner";
       setAccess("owner");
       setPortfolio(loadLocal());
+      setLoading(false);
       return;
     }
 
     if (userRef.current?.id === user.id) return;
     userRef.current = user;
+    setLoading(true);
+    setError(null);
 
     (async () => {
       try {
         const res = await fetch("/api/portfolio", { cache: "no-store" });
+        if (!res.ok) throw new Error("portfolio");
         const data = await res.json();
         const role: AccountRole = data.access === "viewer" ? "viewer" : "owner";
         const next = parsePortfolio(data);
@@ -97,17 +93,9 @@ export function usePortfolio(user: User | null) {
         setPortfolio(local);
         setAccess("owner");
         accessRef.current = "owner";
-        if (!isEmpty(local)) {
-          try {
-            await fetch("/api/portfolio", {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(local),
-            });
-          } catch {
-            /* ignore */
-          }
-        }
+        setError("Varlıklar sunucudan alınamadı. Yeniden yükleyip tekrar dene.");
+      } finally {
+        setLoading(false);
       }
     })();
   }, [user]);
@@ -117,23 +105,27 @@ export function usePortfolio(user: User | null) {
 
   const updateAsset = useCallback(
     async (key: AssetKey, holding: AssetHolding) => {
-      if (accessRef.current === "viewer") return;
-
+      if (accessRef.current === "viewer") throw new Error("Salt okunur hesap");
+      if (writingRef.current) throw new Error("Kayıt sürüyor");
+      if (Object.values(holding).some((value) => !Number.isFinite(value) || value < 0)) {
+        throw new Error("Geçersiz miktar");
+      }
       const next = { ...portfolioRef.current, [key]: holding };
-      portfolioRef.current = next;
-      setPortfolio(next);
-      saveLocal(next);
-
-      if (userRef.current) {
-        try {
-          await fetch("/api/portfolio", {
+      writingRef.current = true;
+      try {
+        if (userRef.current) {
+          const response = await fetch("/api/portfolio", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(next),
           });
-        } catch {
-          /* ignore */
+          if (!response.ok) throw new Error("Varlık kaydedilemedi");
         }
+        portfolioRef.current = next;
+        setPortfolio(next);
+        saveLocal(next);
+      } finally {
+        writingRef.current = false;
       }
     },
     []
@@ -150,5 +142,5 @@ export function usePortfolio(user: User | null) {
     [updateAsset]
   );
 
-  return { portfolio, updateAsset, adjustAsset, access, isViewer: access === "viewer" };
+  return { portfolio, updateAsset, adjustAsset, access, loading, error, isViewer: access === "viewer" };
 }

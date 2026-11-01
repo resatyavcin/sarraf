@@ -18,8 +18,14 @@ function Mark({ state }: { state: FetchMark }) {
 export function FetchChecks({ onRefetch }: { onRefetch: (key: FetchKey) => void }) {
   const marks = useFetchMarks();
 
+  const failed = FETCH_KEYS.filter((key) => marks[key] === "error").length;
+  const pending = FETCH_KEYS.some((key) => marks[key] === "pending");
+
   return (
-    <div className="mt-4">
+    <details key={failed > 0 ? "error" : "normal"} open={failed > 0 ? true : undefined} className="mt-3 text-xs text-muted-foreground">
+      <summary className={cn("min-h-11 cursor-pointer py-3", failed > 0 && "text-red-600")}>
+        {failed > 0 ? `${failed} veri grubu yüklenemedi · Yeniden dene` : pending ? "Bütçe verileri yükleniyor…" : "Veriler yüklendi · Yenileme seçenekleri"}
+      </summary>
       <div className="flex gap-1.5 overflow-x-auto">
         {FETCH_KEYS.map((key) => {
           const state = marks[key];
@@ -37,7 +43,7 @@ export function FetchChecks({ onRefetch }: { onRefetch: (key: FetchKey) => void 
               onClick={() => onRefetch(key)}
               aria-label={label}
               className={cn(
-                "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-medium transition-colors disabled:cursor-default",
+                "inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl border px-3 py-1 text-xs font-medium transition-colors disabled:cursor-default",
                 state === "ok" && "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300",
                 state === "error" && "border-red-500/40 bg-red-500/10 text-red-600 hover:bg-red-500/20",
                 state === "pending" && "text-muted-foreground"
@@ -50,6 +56,6 @@ export function FetchChecks({ onRefetch }: { onRefetch: (key: FetchKey) => void 
           );
         })}
       </div>
-    </div>
+    </details>
   );
 }

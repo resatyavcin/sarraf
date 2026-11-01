@@ -3,14 +3,15 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { Dialog } from "radix-ui";
-import { ChevronLeft, ChevronRight, Info, Settings, Trash2, Wallet, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Info, Plus, PiggyBank, Search, Settings, Trash2, Wallet, X } from "lucide-react";
+import { DeleteMovementDialog } from "@/components/delete-movement-dialog";
 import { BudgetSettingsDrawer } from "@/components/budget-settings-drawer";
 import { FetchChecks } from "@/components/fetch-checks";
 import { MoneyPadSheet } from "@/components/money-pad";
 import { playTick } from "@/lib/play-tick";
 import { budgetPeriodBounds, budgetToday, currentBudgetPeriod, last12BudgetPeriods, shiftBudgetMonth } from "@/lib/budget-period";
 import { newBudgetId, useBudget } from "@/hooks/use-budget";
-import { categoryCoversMonth, computeMonthBudget, entryBudgetPeriod } from "@/lib/budget";
+import { categoryCoversMonth, computeMonthBudget, entryBudgetPeriod, selectBudgetEntries } from "@/lib/budget";
 import type { BudgetCategory, BudgetEntry } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -125,7 +126,6 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
   const [pad, setPad] = useState<"wish" | "expense" | null>(null);
   const [statementPad, setStatementPad] = useState<string | null>(null);
   const [confirmEntry, setConfirmEntry] = useState<BudgetEntry | null>(null);
-  const [confirmText, setConfirmText] = useState("");
   const activeMonth = months.includes(month) ? month : months[months.length - 1];
   const monthIndex = Math.max(0, months.indexOf(activeMonth));
 
@@ -149,25 +149,23 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
     .reduce((sum, entry) => sum + entry.amount, 0);
   const categoryEntries = math.monthEntries.filter((entry) => !statementIds.has(entry.categoryId));
   const categoryExpenses = categoryEntries.reduce((sum, entry) => sum + entry.amount, 0);
+  const categorySummary = selectBudgetEntries(categoryEntries, categories, filteredCategory?.id ?? null);
   const wish = wishes[activeMonth] ?? 0;
+  const missingStatements = required.filter((category) => !math.monthEntries.some((entry) => entry.categoryId === category.id)).length;
   const latestRecordedMonth = months.findLast((key) =>
     budget.entries.some((entry) => entryBudgetPeriod(entry, budget.categories) === key)
   );
 
-  const confirmReady = confirmText.trim().toLocaleLowerCase("tr") === "onaylıyorum";
-
   function askDelete(entry: BudgetEntry) {
-    setConfirmText("");
     setConfirmEntry(entry);
   }
 
   function closeConfirm() {
     setConfirmEntry(null);
-    setConfirmText("");
   }
 
   function confirmDelete() {
-    if (!confirmEntry || !confirmReady) return;
+    if (!confirmEntry) return;
     playTick();
     budget.deleteEntry(confirmEntry.id);
     closeConfirm();
@@ -189,14 +187,14 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
 
   if (budget.loading) {
     return (
-      <section className="rounded-2xl border bg-card p-5">
+      <section className="rounded-3xl border bg-card p-4 sm:p-6">
         <div className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/15">
             <Wallet className="h-5 w-5 text-sky-600" />
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-sm font-semibold">Aylık Bütçe</h2>
-            <p className="truncate text-xs text-muted-foreground">Gelir, gider, harcama</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Dönemini planla, harcamalarını takip et</p>
           </div>
         </div>
         <FetchChecks onRefetch={budget.refetch} />
@@ -206,14 +204,14 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
   }
 
   return (
-    <section className="rounded-2xl border bg-card p-5">
+    <section className="rounded-3xl border bg-card p-4 sm:p-6">
       <div className="flex items-center gap-2.5">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/15">
           <Wallet className="h-5 w-5 text-sky-600" />
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold">Aylık Bütçe</h2>
-          <p className="truncate text-xs text-muted-foreground">Gelir, gider, harcama</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Dönemini planla, harcamalarını takip et</p>
         </div>
         <button
           type="button"
@@ -221,7 +219,7 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
             playTick();
             setInfoOpen(true);
           }}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           aria-label="Ay dökümü"
         >
           <Info className="h-4 w-4" />
@@ -229,7 +227,7 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
         <button
           type="button"
           onClick={() => setSettingsOpen(true)}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           aria-label="Sabitler"
         >
           <Settings className="h-4 w-4" />
@@ -238,7 +236,7 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
 
       <FetchChecks onRefetch={budget.refetch} />
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-5 flex items-center justify-between gap-2 rounded-2xl border bg-muted/20 p-1">
         <button
           type="button"
           aria-label="Önceki ay"
@@ -249,9 +247,12 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
           <ChevronLeft className="h-4 w-4" />
         </button>
         <div className="text-center">
-          <p className="text-sm font-medium">{formatMonth(activeMonth)}</p>
+          <label className="sr-only" htmlFor="budget-period">Bütçe dönemi</label>
+          <select id="budget-period" value={activeMonth} onChange={(event) => setMonth(event.target.value)} className="h-11 max-w-full rounded-lg bg-transparent px-2 text-center text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {[...months].reverse().map((key) => <option key={key} value={key}>{formatMonth(key)}</option>)}
+          </select>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            24 {MONTHS[Number(shiftBudgetMonth(activeMonth, -1).slice(5, 7)) - 1]} – 24 {MONTHS[Number(activeMonth.slice(5, 7)) - 1]} öncesi
+            24 {MONTHS[Number(shiftBudgetMonth(activeMonth, -1).slice(5, 7)) - 1]} – 23 {MONTHS[Number(activeMonth.slice(5, 7)) - 1]}
           </p>
         </div>
         <button
@@ -264,6 +265,36 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
+
+      {activeMonth !== currentBudgetPeriod() && <button type="button" onClick={() => setMonth(currentBudgetPeriod())} className="mt-1 flex min-h-11 w-full items-center justify-center text-xs font-medium text-muted-foreground hover:text-foreground">Güncel döneme dön</button>}
+
+      <div className={cn("mt-4 rounded-2xl border p-5", math.left < 0 ? "border-red-500/20 bg-red-500/5" : "border-emerald-500/20 bg-emerald-500/5")}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-medium text-muted-foreground">{math.left < 0 ? "Bütçe açığı" : "Harcanabilir kalan"}</p>
+          <button type="button" onClick={() => setInfoOpen(true)} className="min-h-11 rounded-lg px-2 text-xs font-medium text-muted-foreground hover:bg-background/60">Hesap dökümü <span aria-hidden>↗</span></button>
+        </div>
+        <p className={cn("mt-1 break-words text-4xl font-semibold tracking-tight tabular-nums", math.left < 0 && "text-red-600")}>
+          {fmt(math.left)} <span className="text-xl font-normal text-muted-foreground">₺</span>
+        </p>
+        <div className="mt-5 h-2 overflow-hidden rounded-full bg-foreground/5" role="progressbar" aria-label="Harcanabilir bütçenin kullanılan oranı" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(spentRatio)}>
+          <div className={cn("h-full rounded-full", math.left < 0 ? "bg-red-500" : "bg-emerald-500")} style={{width:`${spentRatio}%`}} />
+        </div>
+        <div className="mt-2 flex flex-wrap justify-between gap-1 text-xs text-muted-foreground">
+          <span>Harcanan <span className="font-medium tabular-nums text-foreground">{fmt(math.expenses)} ₺</span></span>
+          <span>Bütçe <span className="font-medium tabular-nums text-foreground">{fmt(math.spendable)} ₺</span></span>
+        </div>
+        {missingStatements > 0 && <p className="mt-3 border-t border-foreground/5 pt-3 text-xs leading-5 text-muted-foreground">{missingStatements} ekstrenin tutarı henüz girilmedi. Kalan tutar, ekstreler tamamlandığında güncellenecek.</p>}
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className="min-w-0 rounded-2xl border p-4"><p className="text-xs text-muted-foreground">Dönem geliri</p><p className="mt-1 break-words text-lg font-semibold tabular-nums">{fmt(math.income)} ₺</p></div>
+        <div className="min-w-0 rounded-2xl border p-4"><p className="text-xs text-muted-foreground">Sabit giderler</p><p className="mt-1 break-words text-lg font-semibold tabular-nums">{fmt(math.fixed)} ₺</p></div>
+      </div>
+      <button type="button" disabled={locked} onClick={() => { playTick(); setPad("wish"); }} className="mt-3 flex min-h-20 w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left enabled:hover:bg-muted/40 enabled:active:bg-muted/60 disabled:cursor-default">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600"><PiggyBank className="h-5 w-5" /></span>
+        <span className="min-w-0 flex-1"><span className="block text-sm font-medium">Biriktirmek istediğim</span><span className="mt-1 block text-xs text-muted-foreground">Bu dönem harcanacak paradan ayrılır</span></span>
+        <span className="shrink-0 text-right"><span className="block text-sm font-semibold tabular-nums">{wish > 0 ? `${fmt(wish)} ₺` : locked ? "0 ₺" : "Tutar gir"}</span>{!locked && <span className="mt-1 block text-xs text-muted-foreground">Düzenle</span>}</span>
+      </button>
 
       {math.monthEntries.length === 0 && (
         <div className="mt-4 rounded-xl bg-muted/50 px-3 py-3 text-center text-sm text-muted-foreground">
@@ -280,45 +311,9 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
         </div>
       )}
 
-      <div className="mt-4 text-center">
-        <p className="text-xs font-medium text-muted-foreground">Kalan</p>
-        <p
-          className={cn(
-            "mt-1 text-3xl font-semibold tracking-tight tabular-nums",
-            math.left < 0 && "text-red-600"
-          )}
-        >
-          {fmt(math.left)} ₺
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Harcanacak {fmt(math.spendable)} ₺
-        </p>
-        <div className="mx-auto mt-3 h-1.5 max-w-xs overflow-hidden rounded-full bg-muted">
-          <div
-            className={cn("h-full rounded-full", math.left < 0 ? "bg-red-500" : "bg-emerald-500")}
-            style={{ width: `${spentRatio}%` }}
-          />
-        </div>
-      </div>
-
-      <button
-        type="button"
-        disabled={locked}
-        onClick={() => {
-          playTick();
-          setPad("wish");
-        }}
-        className="mt-5 flex h-11 w-full items-center justify-between rounded-xl border px-3 text-left disabled:opacity-70"
-      >
-        <span className="text-sm text-muted-foreground">Biriktirmek istediğim</span>
-        <span className={cn("text-sm font-medium tabular-nums", wish === 0 && "text-muted-foreground")}>
-          {wish > 0 ? `${fmt(wish)} ₺` : "Tutar gir"}
-        </span>
-      </button>
-
       {required.length > 0 && (
-        <div className="mt-6">
-          <BlockTitle title="Ekstre" hint="Kalan paradan düşer" total={statementTotal} />
+        <div className="mt-6 border-t pt-5">
+          <BlockTitle title="Ekstreler" hint={missingStatements ? `${missingStatements} ekstre tutarı bekleniyor` : "Bu dönemin tüm ekstreleri girildi"} total={statementTotal} />
           <div className="mt-3 space-y-2">
             {required.map((category) => {
               const saved = math.monthEntries.find((entry) => entry.categoryId === category.id);
@@ -331,9 +326,9 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
                     playTick();
                     setStatementPad(category.id);
                   }}
-                  className="flex h-11 w-full items-center justify-between rounded-xl border px-3 text-left disabled:opacity-70"
+                  className="flex min-h-16 w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left enabled:hover:bg-muted/40 disabled:cursor-default"
                 >
-                  <span className="min-w-0 truncate text-sm text-muted-foreground">{category.name}</span>
+                  <span className="min-w-0"><span className="block truncate text-sm font-medium">{category.name}</span><span className="mt-1 block text-xs text-muted-foreground">{saved == null ? "Tutar bekleniyor" : "Döneme dahil edildi"}</span></span>
                   <span
                     className={cn(
                       "shrink-0 text-sm font-medium tabular-nums",
@@ -349,26 +344,27 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
         </div>
       )}
 
-      <div className="mt-6">
+      <div className="mt-6 border-t pt-5">
         <BlockTitle
-          title="Giderler"
-          hint="Harcanacak paradan düşer"
-          total={categoryExpenses}
+          title={filteredCategory?.name ?? "Giderler"}
+          hint={`${formatMonth(activeMonth)} · ${categorySummary.count} hareket`}
+          total={categorySummary.total}
         />
         {categories.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
             <button
               type="button"
+              aria-pressed={filteredCategory === null}
               onClick={() => {
                 playTick();
                 setFilterId(null);
               }}
               className={cn(
-                "flex h-11 items-center rounded-full px-3.5 text-sm font-medium",
-                filterId === null ? "bg-foreground text-background" : "bg-muted text-muted-foreground"
+                "flex min-h-16 flex-col items-start justify-center rounded-xl border px-3 py-2 text-left text-sm font-medium",
+                filteredCategory === null ? "bg-foreground text-background" : "bg-muted text-muted-foreground"
               )}
             >
-              Tümü
+              <span>Tüm giderler</span><span className="mt-1 text-xs tabular-nums opacity-70">{fmt(categoryExpenses)} ₺</span>
             </button>
             {categories.map((category) => {
               const active = filterId === category.id;
@@ -376,23 +372,29 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
                 <button
                   key={category.id}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => {
                     playTick();
                     setSelectedId(category.id);
                     setFilterId((current) => (current === category.id ? null : category.id));
                   }}
                   className={cn(
-                    "flex h-11 max-w-48 items-center rounded-full px-3.5 text-sm font-medium",
+                    "flex min-h-16 min-w-0 flex-col items-start justify-center rounded-xl border px-3 py-2 text-left text-sm font-medium",
                     active ? "bg-foreground text-background" : "bg-muted text-muted-foreground"
                   )}
                 >
-                  <span className="truncate">{category.name}</span>
+                  <span className="w-full truncate">{category.name}</span>
+                  <span className={cn("mt-1 text-xs tabular-nums", active ? "text-background/70" : "text-muted-foreground")}>
+                    {fmt(categoryEntries.filter((entry) => entry.categoryId === category.id).reduce((sum, entry) => sum + entry.amount, 0))} ₺
+                  </span>
                 </button>
               );
             })}
           </div>
         )}
         {filteredCategory && !locked && (
+          <details className="mt-2 text-sm text-muted-foreground">
+            <summary className="min-h-11 cursor-pointer py-3">Kategori seçenekleri</summary>
           <button
             type="button"
             onClick={() => {
@@ -415,6 +417,7 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
             <Trash2 className="mr-1.5 h-3.5 w-3.5" />
             {filteredCategory.name} kategorisini sil
           </button>
+          </details>
         )}
         {!locked && selected && (
           <button
@@ -425,7 +428,7 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
             }}
             className="mt-3 flex h-11 w-full items-center justify-between gap-3 rounded-xl bg-foreground px-3.5 text-background"
           >
-            <span className="text-sm font-medium">Hareket ekle</span>
+            <span className="flex items-center gap-2 text-sm font-medium"><Plus className="h-4 w-4" />Hareket ekle</span>
             <span className="truncate text-sm text-background/70">{selected.name}</span>
           </button>
         )}
@@ -434,7 +437,9 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
             Hareket girmek için önce bir kategori ekle.
           </p>
         )}
-        <AddNameForm
+        {!locked && <details className="mt-3 rounded-xl border px-3">
+          <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-muted-foreground">+ Yeni kategori oluştur</summary>
+          <div className="pb-3">        <AddNameForm
           readOnly={locked}
           onAdd={(name) => {
             playTick();
@@ -444,10 +449,14 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
             setFilterId(id);
           }}
         />
+          </div>
+        </details>}
         <SpendBreakdown
+          key={`${activeMonth}-${filteredCategory?.id ?? "all"}`}
           categories={categories}
           entries={categoryEntries}
-          filterId={filterId}
+          filterId={filteredCategory?.id ?? null}
+          onClearFilter={() => setFilterId(null)}
           total={categoryExpenses}
           locked={locked}
           onDelete={askDelete}
@@ -511,65 +520,13 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-      <Dialog.Root open={confirmEntry !== null} onOpenChange={(open) => !open && closeConfirm()}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 duration-200 ease-[var(--ease-out)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0" />
-          <Dialog.Content
-            className="fixed inset-0 z-50 flex items-center justify-center px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] outline-none duration-200 ease-[var(--ease-out)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95"
-            onPointerDown={(event) => {
-              if (event.target === event.currentTarget) closeConfirm();
-            }}
-          >
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                confirmDelete();
-              }}
-              className="w-full max-w-sm rounded-2xl border bg-background p-5 shadow-xl"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 pt-1.5">
-                  <Dialog.Title className="text-sm font-semibold">Hareketi sil</Dialog.Title>
-                  <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-                    {confirmEntry
-                      ? `${confirmEntry.label.trim() || "Hareket"} · ${fmt(confirmEntry.amount)} ₺`
-                      : "Bu hareket silinecek."}
-                  </Dialog.Description>
-                </div>
-                <Dialog.Close
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-                  aria-label="Kapat"
-                >
-                  <X className="h-4 w-4" />
-                </Dialog.Close>
-              </div>
-              <label className="mt-4 block">
-                <span className="mb-1.5 block text-xs text-muted-foreground">
-                  Silmek için onaylıyorum yaz
-                </span>
-                <input
-                  value={confirmText}
-                  onChange={(event) => setConfirmText(event.target.value)}
-                  placeholder="onaylıyorum"
-                  autoComplete="off"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  enterKeyHint="done"
-                  className="h-11 w-full rounded-xl border bg-transparent px-3 text-base outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={!confirmReady}
-                className="mt-3 flex h-11 w-full items-center justify-center rounded-xl bg-red-600 text-sm font-medium text-white disabled:opacity-40"
-              >
-                Sil
-              </button>
-            </form>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+      <DeleteMovementDialog
+        key={confirmEntry?.id ?? "closed"}
+        entry={confirmEntry}
+        categoryName={budget.categories.find((category) => category.id === confirmEntry?.categoryId)?.name ?? "Gider"}
+        onClose={closeConfirm}
+        onConfirm={confirmDelete}
+      />
       <BudgetSettingsDrawer
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
@@ -675,12 +632,7 @@ function BreakdownRow({
 }
 
 function SpendBreakdown({
-  categories,
-  entries,
-  filterId,
-  total,
-  locked,
-  onDelete,
+  categories, entries, filterId, total, locked, onDelete, onClearFilter,
 }: {
   categories: BudgetCategory[];
   entries: BudgetEntry[];
@@ -688,105 +640,87 @@ function SpendBreakdown({
   total: number;
   locked: boolean;
   onDelete: (entry: BudgetEntry) => void;
+  onClearFilter: () => void;
 }) {
-  const slices = categories.flatMap((category, index) => {
-    const amount = entries
-      .filter((entry) => entry.categoryId === category.id)
-      .reduce((sum, entry) => sum + entry.amount, 0);
-    if (amount <= 0) return [];
-    return [{ category, amount, color: CATEGORY_COLORS[index % CATEGORY_COLORS.length] }];
-  });
-
-  const shown = (filterId ? entries.filter((entry) => entry.categoryId === filterId) : entries)
-    .slice()
-    .sort((a, b) => (b.spentOn ?? "").localeCompare(a.spentOn ?? ""));
-
-  const reducedMotion = useSyncExternalStore(subscribeReducedMotion, reducedMotionSnapshot, () => false);
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<"date" | "amount">("date");
   const [openId, setOpenId] = useState<string | null>(null);
+  const reducedMotion = useSyncExternalStore(subscribeReducedMotion, reducedMotionSnapshot, () => false);
+  const { shown, total: selectedTotal, count, shownTotal } = selectBudgetEntries(entries, categories, filterId, query, sort);
+  const selectedCategory = categories.find((category) => category.id === filterId);
+  const slices = categories.flatMap((category, index) => {
+    const amount = entries.filter((entry) => entry.categoryId === category.id).reduce((sum, entry) => sum + entry.amount, 0);
+    return amount > 0 ? [{ category, amount, color: CATEGORY_COLORS[index % CATEGORY_COLORS.length] }] : [];
+  });
+  const groups = new Map<string, BudgetEntry[]>();
+  for (const entry of shown) {
+    const key = sort === "date" ? entry.spentOn ?? "undated" : "amount";
+    const group = groups.get(key) ?? [];
+    group.push(entry);
+    groups.set(key, group);
+  }
 
-  if (entries.length === 0) {
-    return <p className="mt-4 text-sm text-muted-foreground">Bu ay henüz gider yok</p>;
+  function renderEntry(entry: BudgetEntry) {
+    const category = categories.find((item) => item.id === entry.categoryId);
+    const color = CATEGORY_COLORS[Math.max(0, categories.findIndex((item) => item.id === entry.categoryId)) % CATEGORY_COLORS.length];
+    const title = entry.label.trim() || category?.name || "Gider";
+    const body = <>
+      <span aria-hidden className={cn("size-2 shrink-0 rounded-full", color)} />
+      <div className="min-w-0 flex-1">
+        <p className="break-words text-sm font-medium leading-5">{title}</p>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">{category?.name ?? "Gider"}{sort === "amount" ? ` · ${formatSpentOn(entry.spentOn) ?? "Tarihsiz"}` : ""}</p>
+      </div>
+      <p className="shrink-0 text-sm font-medium tabular-nums">−{fmt(entry.amount)} ₺</p>
+      {!locked && !reducedMotion && <button type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onDelete(entry); }} aria-label={`${title} hareketini sil`} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-red-600"><Trash2 className="h-4 w-4" /></button>}
+    </>;
+    if (locked || reducedMotion) return <li key={entry.id} className="flex min-h-16 items-center gap-3 py-3">
+      {body}
+      {!locked && <button type="button" onClick={() => onDelete(entry)} aria-label={`${title} hareketini sil`} className="flex h-11 shrink-0 items-center px-2 text-sm text-red-600">Sil</button>}
+    </li>;
+    return <SwipeRow key={entry.id} open={openId === entry.id} onOpenChange={(next) => setOpenId(next ? entry.id : null)} onDelete={() => onDelete(entry)}>{body}</SwipeRow>;
   }
 
   return (
-    <div className="mt-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-xs text-muted-foreground">Toplam harcama</p>
-        <p className="text-sm font-semibold tabular-nums">{fmt(total)} ₺</p>
+    <div className="mt-6 border-t pt-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold">Hareketlerim</h3>
+          <p className="mt-1 text-xs text-muted-foreground">{selectedCategory?.name ?? "Tüm kategoriler"} · {count} hareket</p>
+        </div>
+        {filterId && <button type="button" onClick={onClearFilter} className="flex min-h-11 shrink-0 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground hover:bg-muted"><X className="h-3.5 w-3.5" />Filtreyi kaldır</button>}
       </div>
-      <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-muted">
-        {slices.map((slice) => (
-          <div
-            key={slice.category.id}
-            className={cn("h-full", slice.color)}
-            style={{ width: `${total > 0 ? (slice.amount / total) * 100 : 0}%` }}
-          />
-        ))}
+      <div className="mt-3 rounded-xl bg-muted/50 p-4" aria-live="polite" aria-atomic="true">
+        <p className="text-xs text-muted-foreground">{selectedCategory ? `${selectedCategory.name} dönem toplamı` : "Dönemin toplam gideri"}</p>
+        <p className="mt-1 break-words text-2xl font-semibold tracking-tight tabular-nums">{fmt(selectedTotal)} ₺</p>
+        {selectedCategory && total > 0 && <p className="mt-1 text-xs text-muted-foreground">Toplam giderlerin %{Math.round(selectedTotal / total * 100)}’i</p>}
+        {!filterId && slices.length > 0 && <>
+          <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-muted" aria-hidden>{slices.map((slice) => <div key={slice.category.id} className={slice.color} style={{width: `${total > 0 ? slice.amount / total * 100 : 0}%`}} />)}</div>
+          <div className="mt-3 flex flex-wrap gap-x-3 gap-y-2">{slices.map((slice) => <span key={slice.category.id} className="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"><span className={cn("size-2 shrink-0 rounded-full",slice.color)} />{slice.category.name}</span>)}</div>
+        </>}
       </div>
-      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5">
-        {slices.map((slice) => (
-          <span key={slice.category.id} className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span className={cn("size-2 rounded-full", slice.color)} />
-            {slice.category.name}
-          </span>
-        ))}
-      </div>
-      {shown.length === 0 ? (
-        <p className="mt-4 text-sm text-muted-foreground">Bu kategoride hareket yok</p>
-      ) : (
-      <ul className="mt-2">
-        {shown.map((entry) => {
-          const category = categories.find((item) => item.id === entry.categoryId);
-          const title = entry.label.trim() || category?.name || "Gider";
-          const when = formatSpentOn(entry.spentOn);
-          const body = (
-            <>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{title}</p>
-                <p className="truncate text-xs text-muted-foreground">{category?.name ?? "Gider"}</p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p className="text-sm font-medium tabular-nums text-red-600 dark:text-red-400">
-                  −{fmt(entry.amount)} ₺
-                </p>
-                <p className="text-[11px] text-muted-foreground">{when ?? "Tarih yok"}</p>
-              </div>
-            </>
-          );
-          if (locked) {
-            return (
-              <li key={entry.id} className="flex items-center gap-3 py-3">
-                {body}
-              </li>
-            );
-          }
-          if (reducedMotion) {
-            return (
-              <li key={entry.id} className="flex items-center gap-3 py-1.5">
-                {body}
-                <button
-                  type="button"
-                  onClick={() => onDelete(entry)}
-                  className="flex h-11 shrink-0 items-center px-1 text-sm font-medium text-red-600"
-                >
-                  Sil
-                </button>
-              </li>
-            );
-          }
-          return (
-            <SwipeRow
-              key={entry.id}
-              open={openId === entry.id}
-              onOpenChange={(next) => setOpenId(next ? entry.id : null)}
-              onDelete={() => onDelete(entry)}
-            >
-              {body}
-            </SwipeRow>
-          );
-        })}
-      </ul>
-      )}
+      {entries.length > 0 && <div className="mt-4 space-y-2">
+        <div className="relative">
+          <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input type="search" value={query} onChange={(event) => { setQuery(event.target.value); setOpenId(null); }} placeholder="İşlem veya kategori ara" aria-label="Hareketlerde ara" className="h-11 w-full rounded-xl border bg-transparent pl-10 pr-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground" role="status">{query.trim() ? `${shown.length} sonuç · ${fmt(shownTotal)} ₺` : `${shown.length} hareket`}</p>
+          <select aria-label="Hareket sıralaması" value={sort} onChange={(event) => { setSort(event.target.value as "date" | "amount"); setOpenId(null); }} className="min-h-11 max-w-full rounded-lg border bg-background px-2 text-base outline-none focus-visible:ring-2 focus-visible:ring-primary/20">
+            <option value="date">En yeni önce</option><option value="amount">En yüksek tutar</option>
+          </select>
+        </div>
+      </div>}
+      {shown.length === 0 ? <div className="mt-4 rounded-xl border border-dashed p-5 text-center">
+        <p className="text-sm font-medium">{query.trim() ? "Aramana uygun hareket yok" : selectedCategory ? "Bu kategoride henüz hareket yok" : "Bu dönemde henüz gider yok"}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{query.trim() ? "Farklı bir işlem adı veya kategori ara." : "Eklediğin hareketler burada görünecek."}</p>
+        {query.trim() && <button type="button" onClick={() => setQuery("")} className="mt-2 min-h-11 px-3 text-sm font-medium">Aramayı temizle</button>}
+      </div> : <div className="mt-2 space-y-3">{Array.from(groups, ([date, group]) => <div key={date}>
+        <div className="flex items-center justify-between gap-3 border-b py-2.5 text-xs text-muted-foreground">
+          <h4 className="font-medium">{date === "amount" ? "Tutara göre" : date === "undated" ? "Tarihsiz hareketler" : `${formatSpentOn(date)} ${date.slice(0,4)}`}</h4>
+          {sort === "date" && <span className="shrink-0 tabular-nums">{fmt(group.reduce((sum, entry) => sum + entry.amount, 0))} ₺</span>}
+        </div>
+        <ul className="divide-y">{group.map(renderEntry)}</ul>
+      </div>)}</div>}
     </div>
   );
 }

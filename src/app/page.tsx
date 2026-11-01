@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useMarketData } from "@/hooks/use-market-data";
 import { useAuth } from "@/hooks/use-auth";
 import { usePortfolio } from "@/hooks/use-portfolio";
@@ -11,17 +11,17 @@ import { SwipeDeck } from "@/components/swipe-deck";
 import { useSavings } from "@/hooks/use-savings";
 import { ViewersPanel } from "@/components/viewers-panel";
 import { useGoldLedger, type GoldLedgerEntry, type GoldSide } from "@/hooks/use-gold-ledger";
-import { playTick } from "@/lib/play-tick";
-import { Wifi, WifiOff, Clock, WalletMinimal, LogOut, UserPlus, Eye, Gem } from "lucide-react";
+import { AssetsSection } from "@/components/assets-section";
+import { portfolioValue } from "@/lib/portfolio";
+import { Wifi, WifiOff, Clock, WalletMinimal, LogOut, UserPlus, Eye } from "lucide-react";
 import { LoadingStatus } from "@/components/loading-status";
-import { Skeleton } from "@/components/ui/skeleton";
 
 const PAGES = ["Bütçe", "Birikim", "Varlık"] as const;
 
 export default function Home() {
   const { data, loading, error, lastFetch, refetch } = useMarketData();
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
-  const { portfolio, adjustAsset, isViewer } = usePortfolio(user);
+  const { portfolio, updateAsset, adjustAsset, isViewer, loading: portfolioLoading, error: portfolioError } = usePortfolio(user);
   const {
     entries: savingsEntries,
     setMonth: setSavingsMonth,
@@ -34,20 +34,7 @@ export default function Home() {
   const [viewersOpen, setViewersOpen] = useState(false);
   const [page, setPage] = useState(0);
 
-  const CURRENCY_SPREAD = 0.008;
-
-  const totalTL = useMemo(() => {
-    if (!data) return 0;
-    const goldVal =
-      (portfolio.gold.physical + portfolio.gold.digital) * data.gold.gramBuy;
-    const usdBuy = data.usd.price * (1 - CURRENCY_SPREAD / 2);
-    const eurBuy = data.eur.price * (1 - CURRENCY_SPREAD / 2);
-    const usdVal =
-      (portfolio.usd.physical + portfolio.usd.digital) * usdBuy;
-    const eurVal =
-      (portfolio.eur.physical + portfolio.eur.digital) * eurBuy;
-    return goldVal + usdVal + eurVal;
-  }, [data, portfolio]);
+  const totalTL = portfolioValue(portfolio, data);
 
   // Supabase bazen code'u / yerine /auth/callback'e gönderir; /?code= gelirse callback'e yönlendir
   useEffect(() => {
@@ -152,12 +139,12 @@ export default function Home() {
           <div className="mx-auto flex max-w-4xl items-center gap-2 px-4 py-2">
             <WalletMinimal className="h-4 w-4 text-foreground" />
             <span className="text-sm font-semibold tabular-nums">
-              {totalTL > 0
+              {totalTL !== null
                 ? `${totalTL.toLocaleString("tr-TR", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })} ₺`
-                : "0,00 ₺"}
+                : "—"}
             </span>
             <span className="text-xs text-muted-foreground">Toplam Varlık</span>
           </div>
@@ -205,73 +192,16 @@ export default function Home() {
               onSave={setSavingsMonth}
             />
           </div>
-          <div className="space-y-6">
-            <div className="overflow-hidden rounded-2xl border border-amber-200/70 bg-gradient-to-br from-amber-50 via-card to-yellow-50/40 shadow-sm dark:border-amber-500/20 dark:from-amber-950/30 dark:via-card dark:to-yellow-950/10">
-          <div className="flex items-center gap-2.5 px-5 pt-5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/15">
-              <Gem className="h-5 w-5 text-amber-500" />
-            </div>
-            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Gram Altın
-            </span>
-          </div>
-          <div className="mt-5 grid grid-cols-2 gap-4 px-5">
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
-                Alış
-              </p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-amber-600 dark:text-amber-400">
-                {data
-                  ? data.gold.gramBuy.toLocaleString("tr-TR", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })
-                  : "—"}
-                <span className="ml-1 text-sm font-normal text-muted-foreground">₺</span>
-              </p>
-            </div>
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
-                Satış
-              </p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-amber-600 dark:text-amber-400">
-                {data
-                  ? data.gold.gramSell.toLocaleString("tr-TR", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })
-                  : "—"}
-                <span className="ml-1 text-sm font-normal text-muted-foreground">₺</span>
-              </p>
-            </div>
-          </div>
-          <div className="mt-5 grid grid-cols-2 border-t border-amber-200/70 dark:border-amber-500/20">
-            <HoldingButton
-              label="Fiziksel"
-              grams={portfolio.gold.physical}
-              disabled={readOnly}
-              onClick={() => setAddSide("physical")}
-            />
-            <HoldingButton
-              label="Dijital"
-              grams={portfolio.gold.digital}
-              disabled={readOnly}
-              onClick={() => setAddSide("digital")}
-              divided
-            />
-          </div>
-        </div>
-        {loading && !data ? (
-          <LoadingSkeleton />
-        ) : error && !data ? (
-          <ErrorState message={error} onRetry={refetch} />
-        ) : null}
-            {data && (
-              <p className="pb-4 text-center text-xs text-muted-foreground">
-                Veriler Twelve Data API&apos;den alınmaktadır • 10 dakikada bir güncellenir
-              </p>
-            )}
-          </div>
+          <AssetsSection
+            portfolio={portfolio}
+            market={data}
+            readOnly={readOnly || portfolioError !== null}
+            loading={portfolioLoading || loading}
+            error={portfolioError ?? (error ? (data ? "Güncel fiyatlar alınamadı. Son alınan fiyatlar gösteriliyor." : "Güncel fiyatlar alınamadı. Fiyatları yenileyerek tekrar dene.") : null)}
+            onRetry={refetch}
+            onUpdate={updateAsset}
+            onGoldAdd={setAddSide}
+          />
         </SwipeDeck>
       </main>
 
@@ -283,13 +213,13 @@ export default function Home() {
           onOpenChange={(open) => {
             if (!open) setAddSide(null);
           }}
-          onAdd={(side, grams) => {
+          onAdd={async (side, grams) => {
+            await adjustAsset("gold", side, grams);
             push(side, grams);
-            adjustAsset("gold", side, grams);
           }}
-          onUndo={(entry: GoldLedgerEntry) => {
+          onUndo={async (entry: GoldLedgerEntry) => {
+            await adjustAsset("gold", entry.side, -entry.grams);
             drop(entry.id);
-            adjustAsset("gold", entry.side, -entry.grams);
           }}
         />
       )}
@@ -302,41 +232,6 @@ export default function Home() {
         />
       )}
     </div>
-  );
-}
-
-function HoldingButton({
-  label,
-  grams,
-  disabled,
-  divided,
-  onClick,
-}: {
-  label: string;
-  grams: number;
-  disabled: boolean;
-  divided?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => {
-        playTick();
-        onClick();
-      }}
-      className={`px-5 py-3.5 text-left transition-colors enabled:hover:bg-amber-500/10 enabled:active:bg-amber-500/15 disabled:cursor-default ${
-        divided ? "border-l border-amber-200/70 dark:border-amber-500/20" : ""
-      }`}
-    >
-      <p className="text-[11px] font-medium tracking-widest text-muted-foreground uppercase">
-        {label}
-      </p>
-      <p className="mt-0.5 text-sm font-semibold tabular-nums">
-        {grams.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} gr
-      </p>
-    </button>
   );
 }
 
@@ -374,33 +269,6 @@ function PageLoading() {
         height={48}
       />
       <LoadingStatus />
-    </div>
-  );
-}
-
-function LoadingSkeleton() {
-  return (
-    <div className="space-y-6" aria-busy="true">
-      <LoadingStatus />
-      <Skeleton className="h-64 rounded-xl" />
-    </div>
-  );
-}
-
-function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div className="flex flex-col items-center gap-4 py-20 text-center">
-      <WifiOff className="h-12 w-12 text-muted-foreground" />
-      <div>
-        <h2 className="text-lg font-semibold">Bağlantı Hatası</h2>
-        <p className="text-sm text-muted-foreground">{message}</p>
-      </div>
-      <button
-        onClick={onRetry}
-        className="rounded-lg bg-primary px-6 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-      >
-        Tekrar Dene
-      </button>
     </div>
   );
 }

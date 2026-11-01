@@ -1,16 +1,17 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Dialog } from "radix-ui";
+import { Dialog, Tabs } from "radix-ui";
 import { Plus, Trash2, X } from "lucide-react";
 import { newBudgetId } from "@/hooks/use-budget";
 import { MoneyPadSheet } from "@/components/money-pad";
 import { playTick } from "@/lib/play-tick";
 import type { BudgetCategory, BudgetItem } from "@/lib/types";
+import { itemCoversMonth } from "@/lib/budget";
 import { cn } from "@/lib/utils";
 
 const fieldClass =
-  "h-11 w-full rounded-xl border bg-transparent px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20";
+  "h-11 w-full rounded-xl border bg-transparent px-3 text-base outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20";
 
 function fmt(value: number) {
   return value.toLocaleString("tr-TR", {
@@ -55,22 +56,38 @@ export function BudgetSettingsDrawer({
   onDeleteCategory,
 }: BudgetSettingsDrawerProps) {
   const statements = categories.filter((category) => category.kind === "statement");
+  const incomeTotal = incomes.filter((item) => itemCoversMonth(item, defaultMonth)).reduce((sum, item) => sum + item.amount, 0);
+  const fixedTotal = fixedExpenses.filter((item) => itemCoversMonth(item, defaultMonth)).reduce((sum, item) => sum + item.amount, 0);
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0" />
-        <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] flex-col rounded-t-2xl border-t bg-background shadow-xl duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom">
-          <div className="px-5 pt-3">
+        <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 flex max-h-[90dvh] flex-col rounded-t-3xl border-t bg-background shadow-xl duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom">
+          <div className="shrink-0 border-b px-5 pt-3">
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted-foreground/20" />
             <div className="mb-4 flex items-center justify-between">
-              <Dialog.Title className="text-lg font-semibold">Ayarlar</Dialog.Title>
-              <Dialog.Close className="rounded-lg p-1.5 transition-colors hover:bg-muted">
+              <div><Dialog.Title className="text-lg font-semibold">Bütçe ayarları</Dialog.Title><p className="mt-1 text-xs text-muted-foreground">Gelirlerini ve düzenli ödemelerini yönet</p></div>
+              <Dialog.Close aria-label="Ayarları kapat" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-muted">
                 <X className="h-5 w-5 text-muted-foreground" />
               </Dialog.Close>
             </div>
           </div>
-          <div className="space-y-8 overflow-y-auto overscroll-y-contain px-5 pb-[max(2rem,env(safe-area-inset-bottom))]">
+          <div className="min-h-0 overflow-y-auto overscroll-y-contain px-5 pb-[max(2rem,env(safe-area-inset-bottom))]">
+            <div className="my-4 rounded-2xl bg-muted/40 p-4">
+              <p className="text-xs text-muted-foreground">{periodLabel(defaultMonth)} dönemi</p>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div><p className="text-xs text-muted-foreground">Sabit gelir</p><p className="mt-1 break-words text-lg font-semibold tabular-nums">{fmt(incomeTotal)} ₺</p></div>
+                <div className="border-l pl-3"><p className="text-xs text-muted-foreground">Sabit gider</p><p className="mt-1 break-words text-lg font-semibold tabular-nums">{fmt(fixedTotal)} ₺</p></div>
+              </div>
+              <p className="mt-3 border-t pt-3 text-xs leading-5 text-muted-foreground">Dönemler önceki ayın 24’ünde başlar, seçilen ayın 23’ünde biter. Bitiş dönemini boş bırakırsan kayıt devam eder.</p>
+            </div>
+            {readOnly && <p className="mb-4 rounded-xl border p-3 text-sm text-muted-foreground">Paylaşılan hesabı görüntülüyorsun. Ayarlar salt okunur.</p>}
+            <Tabs.Root key={defaultMonth} defaultValue="income">
+              <Tabs.List aria-label="Bütçe ayarları" className="mb-5 grid grid-cols-3 gap-1 rounded-xl bg-muted p-1">
+                {[["income", "Gelirler", incomes.length], ["fixed", "Giderler", fixedExpenses.length], ["statements", "Ekstreler", statements.length]].map(([value, label, count]) => <Tabs.Trigger key={value} value={String(value)} className="min-h-11 rounded-lg px-1 text-sm font-medium text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{label} <span className="ml-1 text-xs opacity-60">{count}</span></Tabs.Trigger>)}
+              </Tabs.List>
+              <Tabs.Content value="income" forceMount className="data-[state=inactive]:hidden outline-none">
             <FixedList
               title="Sabit gelirler"
               hint="Seçtiğin aylarda gelire eklenir."
@@ -82,6 +99,8 @@ export function BudgetSettingsDrawer({
               onSave={onSaveIncome}
               onDelete={onDeleteIncome}
             />
+              </Tabs.Content>
+              <Tabs.Content value="fixed" forceMount className="data-[state=inactive]:hidden outline-none">
             <FixedList
               title="Sabit giderler"
               hint="Seçtiğin aylarda gider olarak düşer."
@@ -93,6 +112,8 @@ export function BudgetSettingsDrawer({
               onSave={onSaveFixed}
               onDelete={onDeleteFixed}
             />
+              </Tabs.Content>
+              <Tabs.Content value="statements" forceMount className="data-[state=inactive]:hidden outline-none">
             <StatementList
               items={statements}
               readOnly={readOnly}
@@ -100,6 +121,8 @@ export function BudgetSettingsDrawer({
               onSave={onSaveCategory}
               onDelete={onDeleteCategory}
             />
+              </Tabs.Content>
+            </Tabs.Root>
           </div>
           <Dialog.Description className="sr-only">
             Sabit gelir, sabit gider ve ekstre dönemlerini düzenle
@@ -108,6 +131,18 @@ export function BudgetSettingsDrawer({
       </Dialog.Portal>
     </Dialog.Root>
   );
+}
+
+function periodLabel(month: string) {
+  if (!month) return "Belirtilmemiş";
+  return new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-01T12:00:00Z`));
+}
+
+function RecordSummary({ name, from, to, amount }: { name: string; from: string | null; to: string | null; amount?: number }) {
+  return <summary className="flex min-h-20 cursor-pointer items-center justify-between gap-3 p-4 marker:content-none">
+    <span className="min-w-0 flex-1"><span className="block break-words text-sm font-semibold">{name}</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{periodLabel(from ?? "")} · {to ? `${periodLabel(to)} sonuna kadar` : "Devam ediyor"}</span></span>
+    <span className="shrink-0 text-right">{amount !== undefined && <span className="block text-sm font-semibold tabular-nums">{fmt(amount)} ₺</span>}<span className="mt-1 block text-xs text-muted-foreground">Detaylar ↓</span></span>
+  </summary>;
 }
 
 function SectionTitle({ title, hint }: { title: string; hint: string }) {
@@ -134,9 +169,9 @@ function MonthFields({
 }) {
   const invalid = Boolean(from && to && to < from);
   return (
-    <div className="space-y-2">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <label className="block">
-        <span className="mb-1 block text-[11px] text-muted-foreground">Başlangıç</span>
+        <span className="mb-1 block text-[11px] text-muted-foreground">İlk dönem</span>
         <input
           type="month"
           value={from}
@@ -147,19 +182,20 @@ function MonthFields({
       </label>
       <label className="block">
         <span className="mb-1 flex items-baseline justify-between gap-2 text-[11px] text-muted-foreground">
-          Bitiş
-          <span>Boşsa sürer</span>
+          Son dönem
+          <span>İsteğe bağlı</span>
         </span>
         <input
           type="month"
           value={to}
+          min={from || undefined}
           readOnly={readOnly}
           onChange={(event) => onTo(event.target.value)}
           className={fieldClass}
         />
       </label>
       {invalid && (
-        <p className="text-xs text-red-600">Bitiş, başlangıçtan önce olamaz.</p>
+        <p role="alert" className="text-xs text-red-600 sm:col-span-2">Bitiş, başlangıçtan önce olamaz.</p>
       )}
     </div>
   );
@@ -205,7 +241,7 @@ function StatementList({
     <section className="space-y-3">
       <SectionTitle
         title="Ekstreler"
-        hint="Dönemi burada. Tutarı bütçe sayfasındaki satırdan girersin."
+        hint="Ekstrenin geçerli olduğu dönemleri belirle. Her dönemin tutarını bütçe kartından gir."
       />
       {items.length === 0 && <p className="text-sm text-muted-foreground">Henüz ekstre yok</p>}
       {items.map((item) => (
@@ -218,12 +254,14 @@ function StatementList({
         />
       ))}
       {!readOnly && (
-        <form onSubmit={add} className="space-y-2 rounded-2xl border border-dashed p-3">
+        <form onSubmit={add} className="space-y-3 rounded-2xl border border-dashed bg-muted/20 p-4">
+          <h4 className="text-sm font-semibold">Yeni ekstre</h4>
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Ekstre adı"
-            aria-label="Ekstre adı"
+            maxLength={60}
+          aria-label="Ekstre adı"
             autoComplete="off"
             enterKeyHint="done"
             className={fieldClass}
@@ -268,16 +306,15 @@ function StatementEditor({
   }
 
   return (
-    <div className="space-y-2 rounded-2xl border p-3">
+    <details className="rounded-2xl border">
+      <RecordSummary name={item.name} from={item.validFrom} to={item.validTo} />
+      <div className="space-y-4 border-t p-4">
       <div className="flex items-center gap-2">
         <input
           value={name}
           readOnly={readOnly}
           onChange={(event) => setName(event.target.value)}
-          onBlur={() => {
-            if (!clean(name)) setName(item.name);
-            else save({ name });
-          }}
+          maxLength={60}
           aria-label="Ekstre adı"
           autoComplete="off"
           enterKeyHint="done"
@@ -286,7 +323,7 @@ function StatementEditor({
         {!readOnly && (
           <DeleteButton
             label="Ekstre sil"
-            confirm="Bu ekstre silinsin mi?"
+            confirm="Bu ekstre ve tüm dönemlerdeki hareketleri silinecek. Devam edilsin mi?"
             onDelete={onDelete}
           />
         )}
@@ -295,16 +332,12 @@ function StatementEditor({
         from={from}
         to={to}
         readOnly={readOnly}
-        onFrom={(value) => {
-          setFrom(value);
-          save({ from: value });
-        }}
-        onTo={(value) => {
-          setTo(value);
-          save({ to: value });
-        }}
+        onFrom={setFrom}
+        onTo={setTo}
       />
-    </div>
+      {!readOnly && <button type="button" disabled={!clean(name) || !from || Boolean(to && to < from) || (clean(name) === item.name && from === item.validFrom && (to || null) === item.validTo)} onClick={() => save({})} className="min-h-11 w-full rounded-xl bg-foreground px-3 text-sm font-medium text-background disabled:opacity-40">Değişiklikleri kaydet</button>}
+      </div>
+    </details>
   );
 }
 
@@ -388,23 +421,22 @@ function FixedEditor({
   }
 
   return (
-    <div className="space-y-2 rounded-2xl border p-3">
+    <details className="rounded-2xl border">
+      <RecordSummary name={item.name} from={item.validFrom} to={item.validTo} amount={item.amount} />
+      <div className="space-y-4 border-t p-4">
       <div className="flex items-center gap-2">
         <input
           value={name}
           readOnly={readOnly}
           onChange={(event) => setName(event.target.value)}
-          onBlur={() => {
-            if (!clean(name)) setName(item.name);
-            else save({ name });
-          }}
+          maxLength={60}
           aria-label="Ad"
           autoComplete="off"
           enterKeyHint="done"
           className={cn(fieldClass, "min-w-0 flex-1")}
         />
         {!readOnly && (
-          <DeleteButton label="Sil" confirm="Bu kayıt silinsin mi?" onDelete={onDelete} />
+          <DeleteButton label="Sil" confirm="Bu kayıt tüm dönemlerden kaldırılacak. Devam edilsin mi?" onDelete={onDelete} />
         )}
       </div>
       <button
@@ -423,14 +455,8 @@ function FixedEditor({
         from={from}
         to={to}
         readOnly={readOnly}
-        onFrom={(value) => {
-          setFrom(value);
-          save({ from: value });
-        }}
-        onTo={(value) => {
-          setTo(value);
-          save({ to: value });
-        }}
+        onFrom={setFrom}
+        onTo={setTo}
       />
       <MoneyPadSheet
         open={padOpen}
@@ -439,10 +465,11 @@ function FixedEditor({
         onOpenChange={setPadOpen}
         onConfirm={(next) => {
           setAmount(next);
-          save({ amount: next });
         }}
       />
-    </div>
+      {!readOnly && <button type="button" disabled={!clean(name) || !from || Boolean(to && to < from) || (clean(name) === item.name && amount === item.amount && from === item.validFrom && (to || null) === item.validTo)} onClick={() => save({})} className="min-h-11 w-full rounded-xl bg-foreground px-3 text-sm font-medium text-background disabled:opacity-40">Değişiklikleri kaydet</button>}
+      </div>
+    </details>
   );
 }
 
@@ -485,10 +512,12 @@ function AddFixedForm({
   }
 
   return (
-    <form onSubmit={submit} className="space-y-2 rounded-2xl border border-dashed p-3">
+    <form onSubmit={submit} className="space-y-3 rounded-2xl border border-dashed bg-muted/20 p-4">
+      <h4 className="text-sm font-semibold">Yeni kayıt ekle</h4>
       <input
         value={name}
         onChange={(event) => setName(event.target.value)}
+        maxLength={60}
         placeholder={placeholder}
         aria-label={placeholder}
         autoComplete="off"

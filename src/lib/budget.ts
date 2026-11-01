@@ -14,6 +14,32 @@ function sumAmounts(items: { amount: number }[]) {
   return items.reduce((acc, item) => acc + (Number(item.amount) || 0), 0);
 }
 
+export function selectBudgetEntries(
+  entries: BudgetEntry[],
+  categories: BudgetCategory[],
+  filterId: string | null,
+  query = "",
+  sort: "date" | "amount" = "date"
+) {
+  const categoryEntries = filterId
+    ? entries.filter((entry) => entry.categoryId === filterId)
+    : entries;
+  const term = query.trim().toLocaleLowerCase("tr-TR");
+  const names = new Map(categories.map((category) => [category.id, category.name]));
+  const shown = categoryEntries.filter((entry) =>
+    !term || `${entry.label} ${names.get(entry.categoryId) ?? ""}`.toLocaleLowerCase("tr-TR").includes(term)
+  ).slice().sort((a, b) => {
+    if (sort === "amount" && a.amount !== b.amount) return b.amount - a.amount;
+    return (b.spentOn ?? "").localeCompare(a.spentOn ?? "") || b.id.localeCompare(a.id);
+  });
+  return {
+    shown,
+    total: sumAmounts(categoryEntries),
+    count: categoryEntries.length,
+    shownTotal: sumAmounts(shown),
+  };
+}
+
 export function itemCoversMonth(item: BudgetItem, month: string) {
   if (item.validFrom > month) return false;
   if (item.validTo && item.validTo < month) return false;

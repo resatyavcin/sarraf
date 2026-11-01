@@ -8,7 +8,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { Pencil, PiggyBank } from "lucide-react";
+import { ChevronRight, Pencil, PiggyBank, Plus } from "lucide-react";
 import type { SavingEntry } from "@/lib/types";
 import { SavingsDrawer } from "@/components/savings-drawer";
 
@@ -69,7 +69,7 @@ function currentMonthKey() {
 const fmt = (v: number) =>
   v.toLocaleString("tr-TR", {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    maximumFractionDigits: 2,
   });
 
 const chartConfig = {
@@ -80,7 +80,7 @@ interface SavingsSectionProps {
   entries: SavingEntry[];
   totals: { sum: number; average: number };
   isViewer: boolean;
-  onSave: (month: string, amount: number) => void;
+  onSave: (month: string, amount: number) => void | Promise<void>;
 }
 
 export function SavingsSection({ entries, totals, isViewer, onSave }: SavingsSectionProps) {
@@ -100,6 +100,11 @@ export function SavingsSection({ entries, totals, isViewer, onSave }: SavingsSec
       };
     });
   }, [entries]);
+
+  const currentMonth = currentMonthKey();
+  const currentAmount = entries.find((entry) => entry.month === currentMonth)?.amount ?? 0;
+  const recordedMonths = entries.filter((entry) => entry.amount > 0).length;
+  const recentEntries = [...entries].reverse();
 
   const rangeLabel =
     chartData.length > 0
@@ -137,22 +142,38 @@ export function SavingsSection({ entries, totals, isViewer, onSave }: SavingsSec
           )}
         </div>
 
-        <div className="mt-5 grid grid-cols-2">
-          <div className="text-center">
-            <p className="text-xs font-medium text-muted-foreground">Toplam</p>
-            <p className="mt-1 text-xl font-semibold tracking-tight tabular-nums">
-              {fmt(totals.sum)} ₺
-            </p>
+        <div className="mt-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+          <p className="text-xs font-medium text-muted-foreground">{monthParts(currentMonth).full} birikimi</p>
+          <p className="mt-2 break-words text-3xl font-semibold tracking-tight tabular-nums">{fmt(currentAmount)} ₺</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {currentAmount > 0 ? "Bu ay gerçekleşen toplam birikimin" : "Bu ay biriktirdiğin tutarı kaydet"}
+          </p>
+          {!isViewer && (
+            <button
+              type="button"
+              onClick={() => openEdit(currentMonth)}
+              className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-foreground px-3 text-sm font-medium text-background active:opacity-80"
+            >
+              {currentAmount > 0 ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {currentAmount > 0 ? "Bu ayın tutarını düzenle" : "Bu ayın birikimini gir"}
+            </button>
+          )}
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground">Son 12 ay toplamı</p>
+            <p className="mt-1 break-words text-xl font-semibold tracking-tight tabular-nums">{fmt(totals.sum)} ₺</p>
           </div>
-          <div className="border-l text-center">
-            <p className="text-xs font-medium text-muted-foreground">Ortalama</p>
-            <p className="mt-1 text-xl font-semibold tracking-tight tabular-nums">
-              {fmt(totals.average)} ₺
-            </p>
+          <div className="min-w-0 border-l pl-3">
+            <p className="text-xs text-muted-foreground">Birikim yapılan ay ortalaması</p>
+            <p className="mt-1 break-words text-xl font-semibold tracking-tight tabular-nums">{fmt(totals.average)} ₺</p>
+            <p className="mt-1 text-xs text-muted-foreground">{recordedMonths} ay üzerinden</p>
           </div>
         </div>
 
-        <div className="mt-4">
+        <div className="mt-6">
+          <h3 className="text-sm font-medium">Birikim geçmişi</h3>
           <ChartContainer config={chartConfig} className="h-56 w-full">
             <BarChart
               data={chartData}
@@ -220,6 +241,35 @@ export function SavingsSection({ entries, totals, isViewer, onSave }: SavingsSec
               </Bar>
             </BarChart>
           </ChartContainer>
+        </div>
+        <div className="mt-4 border-t pt-4">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="text-sm font-medium">Aylık kayıtlar</h3>
+            <span className="text-xs text-muted-foreground">Yeni aydan eskiye</span>
+          </div>
+          <div className="divide-y">
+            {recentEntries.map((entry) => (
+              <button
+                key={entry.month}
+                type="button"
+                disabled={isViewer}
+                onClick={() => openEdit(entry.month)}
+                aria-label={`${monthParts(entry.month).full}: ${fmt(entry.amount)} lira${isViewer ? "" : ", düzenle"}`}
+                className="flex min-h-14 w-full items-center justify-between gap-3 rounded-lg px-2 py-3 text-left enabled:hover:bg-muted/50 enabled:active:bg-muted disabled:cursor-default"
+              >
+                <span className="min-w-0 text-sm">
+                  {monthParts(entry.month).full}
+                  {entry.month === currentMonth && <span className="ml-2 text-xs text-muted-foreground">Bu ay</span>}
+                </span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <span className={`text-sm tabular-nums ${entry.amount > 0 ? "font-medium" : "text-muted-foreground"}`}>
+                    {entry.amount > 0 ? `${fmt(entry.amount)} ₺` : "0 ₺"}
+                  </span>
+                  {!isViewer && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 

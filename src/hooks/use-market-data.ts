@@ -64,5 +64,5 @@ export function useMarketData() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { data, loading, error, lastFetch, refetch: () => fetchData(false) };
+  return { data, loading, error, lastFetch, refetch: () => fetchData(true) };
 }
