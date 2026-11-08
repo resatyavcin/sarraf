@@ -189,8 +189,8 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
     return (
       <section className="rounded-3xl border bg-card p-4 sm:p-6">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/15">
-            <Wallet className="h-5 w-5 text-sky-600" />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+            <Wallet className="h-5 w-5 text-primary" />
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-sm font-semibold">Aylık Bütçe</h2>
@@ -206,8 +206,8 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
   return (
     <section className="rounded-3xl border bg-card p-4 sm:p-6">
       <div className="flex items-center gap-2.5">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/15">
-          <Wallet className="h-5 w-5 text-sky-600" />
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+          <Wallet className="h-5 w-5 text-primary" />
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold">Aylık Bütçe</h2>
@@ -361,7 +361,7 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
               }}
               className={cn(
                 "flex min-h-16 flex-col items-start justify-center rounded-xl border px-3 py-2 text-left text-sm font-medium",
-                filteredCategory === null ? "bg-foreground text-background" : "bg-muted text-muted-foreground"
+                filteredCategory === null ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
               )}
             >
               <span>Tüm giderler</span><span className="mt-1 text-xs tabular-nums opacity-70">{fmt(categoryExpenses)} ₺</span>
@@ -380,11 +380,11 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
                   }}
                   className={cn(
                     "flex min-h-16 min-w-0 flex-col items-start justify-center rounded-xl border px-3 py-2 text-left text-sm font-medium",
-                    active ? "bg-foreground text-background" : "bg-muted text-muted-foreground"
+                    active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
                   )}
                 >
                   <span className="w-full truncate">{category.name}</span>
-                  <span className={cn("mt-1 text-xs tabular-nums", active ? "text-background/70" : "text-muted-foreground")}>
+                  <span className={cn("mt-1 text-xs tabular-nums", active ? "text-primary-foreground/70" : "text-muted-foreground")}>
                     {fmt(categoryEntries.filter((entry) => entry.categoryId === category.id).reduce((sum, entry) => sum + entry.amount, 0))} ₺
                   </span>
                 </button>
@@ -426,10 +426,10 @@ export function BudgetSection({ user, readOnly }: BudgetSectionProps) {
               playTick();
               setPad("expense");
             }}
-            className="mt-3 flex h-11 w-full items-center justify-between gap-3 rounded-xl bg-foreground px-3.5 text-background"
+            className="mt-3 flex h-11 w-full items-center justify-between gap-3 rounded-xl bg-primary px-3.5 text-primary-foreground"
           >
             <span className="flex items-center gap-2 text-sm font-medium"><Plus className="h-4 w-4" />Hareket ekle</span>
-            <span className="truncate text-sm text-background/70">{selected.name}</span>
+            <span className="truncate text-sm text-primary-foreground/70">{selected.name}</span>
           </button>
         )}
         {!locked && categories.length === 0 && (

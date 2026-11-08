@@ -88,7 +88,7 @@ function HoldingEditor({ asset, holding, onClose, onSave }: { asset: AssetKey; h
   }
   return <Dialog.Root open onOpenChange={(open) => { if (!open && !busy.current) onClose(); }}><Dialog.Portal>
     <Dialog.Overlay className="fixed inset-0 z-[70] bg-black/50" />
-    <Dialog.Content className="fixed inset-x-0 bottom-0 z-[70] max-h-[90dvh] overflow-y-auto overscroll-y-contain rounded-t-2xl border-t bg-background p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-xl">
+    <Dialog.Content className="sarraf-sheet fixed inset-x-0 bottom-0 z-[70] max-h-[90dvh] overflow-y-auto overscroll-y-contain rounded-t-2xl border-t bg-background p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-xl">
       <div className="mb-4 flex items-center justify-between gap-3"><Dialog.Title className="text-lg font-semibold">{name} bakiyesi</Dialog.Title><Dialog.Close disabled={saving} aria-label="Kapat" className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-muted"><X className="h-5 w-5" /></Dialog.Close></div>
       <Dialog.Description className="mb-5 text-sm text-muted-foreground">Elindeki toplam miktarları gir. Kaydettiğin miktarlar mevcut bakiyelerin yerini alır.</Dialog.Description>
       <form onSubmit={(event) => { event.preventDefault(); void save(); }} className="space-y-4">

@@ -63,7 +63,7 @@ export function BudgetSettingsDrawer({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0" />
-        <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 flex max-h-[90dvh] flex-col rounded-t-3xl border-t bg-background shadow-xl duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom">
+        <Dialog.Content className="sarraf-sheet fixed inset-x-0 bottom-0 z-50 flex max-h-[90dvh] flex-col rounded-t-3xl border-t bg-background shadow-xl duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom">
           <div className="shrink-0 border-b px-5 pt-3">
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted-foreground/20" />
             <div className="mb-4 flex items-center justify-between">
@@ -270,7 +270,7 @@ function StatementList({
           <button
             type="submit"
             disabled={!canAdd}
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-foreground text-sm font-medium text-background disabled:opacity-40"
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-medium text-primary-foreground disabled:opacity-40"
           >
             <Plus className="h-4 w-4" />
             Ekle
@@ -335,7 +335,7 @@ function StatementEditor({
         onFrom={setFrom}
         onTo={setTo}
       />
-      {!readOnly && <button type="button" disabled={!clean(name) || !from || Boolean(to && to < from) || (clean(name) === item.name && from === item.validFrom && (to || null) === item.validTo)} onClick={() => save({})} className="min-h-11 w-full rounded-xl bg-foreground px-3 text-sm font-medium text-background disabled:opacity-40">Değişiklikleri kaydet</button>}
+      {!readOnly && <button type="button" disabled={!clean(name) || !from || Boolean(to && to < from) || (clean(name) === item.name && from === item.validFrom && (to || null) === item.validTo)} onClick={() => save({})} className="min-h-11 w-full rounded-xl bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-40">Değişiklikleri kaydet</button>}
       </div>
     </details>
   );
@@ -467,7 +467,7 @@ function FixedEditor({
           setAmount(next);
         }}
       />
-      {!readOnly && <button type="button" disabled={!clean(name) || !from || Boolean(to && to < from) || (clean(name) === item.name && amount === item.amount && from === item.validFrom && (to || null) === item.validTo)} onClick={() => save({})} className="min-h-11 w-full rounded-xl bg-foreground px-3 text-sm font-medium text-background disabled:opacity-40">Değişiklikleri kaydet</button>}
+      {!readOnly && <button type="button" disabled={!clean(name) || !from || Boolean(to && to < from) || (clean(name) === item.name && amount === item.amount && from === item.validFrom && (to || null) === item.validTo)} onClick={() => save({})} className="min-h-11 w-full rounded-xl bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-40">Değişiklikleri kaydet</button>}
       </div>
     </details>
   );
@@ -541,7 +541,7 @@ function AddFixedForm({
       <button
         type="submit"
         disabled={!canAdd}
-        className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-foreground text-sm font-medium text-background disabled:opacity-40"
+        className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-medium text-primary-foreground disabled:opacity-40"
       >
         <Plus className="h-4 w-4" />
         Ekle

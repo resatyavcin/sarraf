@@ -9,6 +9,11 @@ const AUTH_MUTATIONS = [
 
 export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  // API handlers validate the user themselves and persist refreshed cookies.
+  // Avoid an extra remote auth request before every API request.
+  if (pathname.startsWith("/api/") || !request.cookies.getAll().some(({ name }) => name.startsWith("sb-"))) {
+    return NextResponse.next();
+  }
   if (AUTH_MUTATIONS.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
     return NextResponse.next();
   }

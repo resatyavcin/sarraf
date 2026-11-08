@@ -7,13 +7,18 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [error, setError] = useState<string | null>(null);
+
   const fetchSession = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const res = await fetch("/api/auth/session", { cache: "no-store" });
+      const res = await fetch("/api/auth/session", { cache: "no-store", signal: AbortSignal.timeout(8000) });
+      if (!res.ok) throw new Error("Session request failed");
       const { user: u } = await res.json();
       setUser(u ?? null);
     } catch {
-      setUser(null);
+      setError("Oturum kontrolü tamamlanamadı. Bağlantını kontrol edip yeniden dene.");
     } finally {
       setLoading(false);
     }
@@ -31,5 +36,5 @@ export function useAuth() {
     window.location.href = "/api/auth/logout";
   }, []);
 
-  return { user, loading, signInWithGoogle, signOut };
+  return { user, loading, error, retry: fetchSession, signInWithGoogle, signOut };
 }

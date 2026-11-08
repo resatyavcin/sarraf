@@ -152,7 +152,7 @@ export function SavingsSection({ entries, totals, isViewer, onSave }: SavingsSec
             <button
               type="button"
               onClick={() => openEdit(currentMonth)}
-              className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-foreground px-3 text-sm font-medium text-background active:opacity-80"
+              className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 text-sm font-medium text-primary-foreground active:opacity-80"
             >
               {currentAmount > 0 ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               {currentAmount > 0 ? "Bu ayın tutarını düzenle" : "Bu ayın birikimini gir"}

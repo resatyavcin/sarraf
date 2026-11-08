@@ -13,14 +13,17 @@ import { ViewersPanel } from "@/components/viewers-panel";
 import { useGoldLedger, type GoldLedgerEntry, type GoldSide } from "@/hooks/use-gold-ledger";
 import { AssetsSection } from "@/components/assets-section";
 import { portfolioValue } from "@/lib/portfolio";
-import { Wifi, WifiOff, Clock, WalletMinimal, LogOut, UserPlus, Eye } from "lucide-react";
+import { Wifi, WifiOff, Clock, WalletMinimal, LogOut, UserPlus, Eye, ArrowUpRight, ShieldCheck, Layers, PiggyBank, ChartNoAxesCombined } from "lucide-react";
 import { LoadingStatus } from "@/components/loading-status";
+
+const PAGE_ICONS = [ChartNoAxesCombined, PiggyBank, Layers];
+const PAGE_DESCRIPTIONS = ["Gelirini planla, harcamalarını dengede tut.", "Küçük adımlar, büyük hedefler.", "Altın ve dövizlerin, tek bir yerde."];
 
 const PAGES = ["Bütçe", "Birikim", "Varlık"] as const;
 
 export default function Home() {
   const { data, loading, error, lastFetch, refetch } = useMarketData();
-  const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
+  const { user, loading: authLoading, error: authError, retry: retryAuth, signInWithGoogle, signOut } = useAuth();
   const { portfolio, updateAsset, adjustAsset, isViewer, loading: portfolioLoading, error: portfolioError } = usePortfolio(user);
   const {
     entries: savingsEntries,
@@ -45,27 +48,26 @@ export default function Home() {
     }
   }, []);
 
+  if (authError) {
+    return <div className="login-shell"><div role="alert" className="max-w-sm space-y-5 text-center"><h1 className="text-xl font-bold">Bağlantı beklenenden uzun sürdü</h1><p className="text-sm text-muted-foreground">{authError}</p><button type="button" onClick={() => void retryAuth()} className="login-cta">Yeniden dene</button></div></div>;
+  }
+
   if (!authLoading && !user) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center bg-background px-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-        <img
-          src="/icons/icon-192.png"
-          alt="Sarraf"
-          className="h-12 w-12 rounded-xl"
-          width={48}
-          height={48}
-        />
-        <h1 className="mt-4 text-xl font-bold tracking-tight">Sarraf</h1>
-        <p className="mt-2 text-center text-sm text-muted-foreground">
-          Varlıklarınızı görmek için giriş yapın
-        </p>
-        <button
-          onClick={signInWithGoogle}
-          className="mt-8 flex items-center gap-2 rounded-xl bg-foreground px-6 py-3 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
-        >
-          <GoogleIcon />
-          Google ile Giriş Yap
-        </button>
+      <div className="login-shell">
+        <div className="login-card">
+          <div className="login-cover"><WalletMinimal size={42} strokeWidth={1.4} /><span>SARRAF / KİŞİSEL FİNANS</span></div>
+          <img src="/icons/icon-192.png" alt="Sarraf" className="login-avatar" width={72} height={72} />
+          <div className="login-body">
+            <div className="eyebrow">PARANIN BUGÜNÜ, HAYALLERİNİN YARINI</div>
+            <h1>Her şeyin hesabı,<br />tek bir yerde.</h1>
+            <p>Bütçeni yönet, birikimini büyüt, varlıklarını takip et. Sarraf ile finansal hayatına biraz daha netlik kat.</p>
+            <div className="login-features">{PAGES.map((label, index) => { const Icon = PAGE_ICONS[index]; return <span key={label}><Icon size={16} />{label}</span>; })}</div>
+            <button onClick={signInWithGoogle} className="login-cta"><GoogleIcon />Google ile devam et<ArrowUpRight size={18} /></button>
+            <div className="login-note"><ShieldCheck size={15} />Sana özel, güvenli bir alan.</div>
+          </div>
+        </div>
+        <p className="login-footer">Sarraf <span>Finansal hayatına iyi bak.</span></p>
       </div>
     );
   }
@@ -75,9 +77,9 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-dvh bg-background">
-      <header className="app-chrome sticky top-0 z-50 bg-background/80 pt-[env(safe-area-inset-top)] backdrop-blur-lg">
-        <div className="mx-auto flex h-14 max-w-lg items-center justify-between gap-2 px-4">
+    <div className="sarraf-app min-h-dvh bg-background">
+      <header className="app-chrome sticky top-0 z-50 bg-background/90 pt-[env(safe-area-inset-top)] backdrop-blur-lg">
+        <div className="mx-auto flex h-18 max-w-4xl items-center justify-between gap-2 px-4">
           <div className="flex min-w-0 items-center gap-2">
             <img
               src="/icons/icon-192.png"
@@ -135,20 +137,6 @@ export default function Home() {
             ) : null}
           </div>
         </div>
-        <div className="border-t border-b bg-muted/30">
-          <div className="mx-auto flex max-w-4xl items-center gap-2 px-4 py-2">
-            <WalletMinimal className="h-4 w-4 text-foreground" />
-            <span className="text-sm font-semibold tabular-nums">
-              {totalTL !== null
-                ? `${totalTL.toLocaleString("tr-TR", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })} ₺`
-                : "—"}
-            </span>
-            <span className="text-xs text-muted-foreground">Toplam Varlık</span>
-          </div>
-        </div>
         {readOnly && (
           <div className="border-b bg-amber-500/10">
             <div className="mx-auto flex max-w-4xl items-center gap-2 px-4 py-2 text-xs text-amber-800 dark:text-amber-200">
@@ -157,31 +145,18 @@ export default function Home() {
             </div>
           </div>
         )}
-        <div className="border-b">
-          <div className="relative mx-auto max-w-4xl">
-            <div className="grid grid-cols-3">
-              {PAGES.map((label, index) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => setPage(index)}
-                  className={`py-2.5 text-center text-sm ${
-                    index === page ? "font-medium text-foreground" : "text-muted-foreground"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div
-              className="absolute bottom-0 left-0 h-0.5 w-1/3 bg-foreground transition-transform duration-200 ease-[var(--ease-out)] motion-reduce:transition-none"
-              style={{ transform: `translateX(${page * 100}%)` }}
-            />
-          </div>
-        </div>
+        <nav className="section-nav" aria-label="Finans bölümleri">
+          {PAGES.map((label, index) => { const Icon = PAGE_ICONS[index]; return (
+            <button key={label} type="button" aria-current={index === page ? "page" : undefined} onClick={() => setPage(index)}><Icon size={18} />{label}</button>
+          ); })}
+        </nav>
       </header>
 
       <main className="mx-auto max-w-4xl py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        <div className="dashboard-intro">
+          <div><p className="eyebrow">FİNANSAL HAYATINA İYİ BAK</p><h2>{PAGES[page]}<span>.</span></h2><p className="intro-description">{PAGE_DESCRIPTIONS[page]}</p></div>
+          <div className="portfolio-summary"><span><WalletMinimal size={15} />Toplam varlık</span><strong>{totalTL !== null ? `${totalTL.toLocaleString("tr-TR", { maximumFractionDigits: 2, minimumFractionDigits: 2 })} ₺` : "—"}</strong><small>Güncel alış fiyatlarıyla</small></div>
+        </div>
         <SwipeDeck index={page} onIndexChange={setPage}>
           <BudgetSection user={user} readOnly={readOnly} />
           <div className="space-y-6">
@@ -203,6 +178,7 @@ export default function Home() {
             onGoldAdd={setAddSide}
           />
         </SwipeDeck>
+        <footer className="dashboard-footer"><span>Sarraf</span><span>Bugünü planla. Yarına biriktir.</span></footer>
       </main>
 
       {!readOnly && (
