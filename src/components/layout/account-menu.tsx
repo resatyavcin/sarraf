@@ -50,7 +50,7 @@ export function AccountMenu({ profile }: { profile: AccountProfile }) {
     finally { busy.current = false; setPending(false); }
   }
   return <Sheet open={open} onOpenChange={value => { if (!busy.current) setOpen(value); }}>
-    <DrawerTrigger asChild><button type="button" aria-label="Hesabım ve paylaşım" className="flex min-w-0 items-center gap-2.5 rounded-full text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
+    <DrawerTrigger asChild><button type="button" aria-label="Hesabım ve paylaşım" className="flex min-w-0 max-w-[48vw] items-center gap-2 rounded-full sm:max-w-none sm:gap-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
       <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary text-sm font-semibold text-secondary-foreground">
         {profile.avatar && !avatarFailed ? <Image src={profile.avatar} alt="" width={40} height={40} unoptimized onError={() => setAvatarFailed(true)} /> : profile.name.slice(0, 1).toLocaleUpperCase("tr-TR")}
       </span><span className="block min-w-0"><span className="block max-w-32 truncate sm:max-w-40 text-sm font-medium">{profile.name}</span><span className="block max-w-32 truncate sm:max-w-40 text-xs text-muted-foreground">{profile.email}</span></span>

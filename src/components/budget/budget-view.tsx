@@ -13,7 +13,7 @@ import { BudgetCategoryField, BudgetCategoryManager, BudgetSummary } from "@/com
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/booking-link/panel-sheet"
 import { saveEntry, deleteEntries, saveCategory, saveSavings, saveSavingsTarget } from "@/data/budget-server"
-import { budgetPeriodForDate, budgetPeriodBounds, entriesForMonth, formatMoney, isValidDate, isValidMonth, parseAmount, removeMonthEntries, upsertBudgetEntry, todayLocal } from "@/lib/budget"
+import { budgetPeriodForDate, entriesForMonth, formatMoney, isValidDate, isValidMonth, parseAmount, removeMonthEntries, upsertBudgetEntry, todayLocal } from "@/lib/budget"
 import { useHydrated } from "@/lib/use-hydrated"
 import { groupCardStatements } from "@/lib/budget-categories"
 import { cn } from "@/lib/utils"
@@ -74,7 +74,6 @@ export function BudgetView({ initial, quickActions, profile }: { profile: Accoun
   const monthlyEntries = entriesForMonth(entries, month, currentMonth)
   const latestMonth = entries.filter((entry) => !entry.recurrence).map((entry) => budgetPeriodForDate(entry.date)).sort().at(-1)
   const selectedIds = selected.filter((id) => monthlyEntries.some((entry) => entry.id === id && !entry.recurrence))
-  const periodBounds = month ? budgetPeriodBounds(month) : null
   const monthLabel = month ? new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(new Date(`${month}-01T12:00:00`)) : "…"
 
   async function commitCategories(categories: BudgetPreferences["categories"]) {
@@ -186,16 +185,14 @@ export function BudgetView({ initial, quickActions, profile }: { profile: Accoun
 
   return (
     <PanelShell profile={profile} headerAction={entries.some((entry) => entry.recurrence) && (
-        <Button variant="ghost" className="rounded-full" disabled={selecting} onClick={() => setFixedOpen(true)}>
-          <Info className="size-4" />Sabit gelir ve giderler
+        <Button variant="ghost" aria-label="Sabit gelir ve giderler" title="Sabit gelir ve giderler" className="size-10 rounded-full p-0 sm:h-9 sm:w-auto sm:px-3.5" disabled={selecting} onClick={() => setFixedOpen(true)}>
+          <Info className="size-4" aria-hidden /><span className="hidden sm:inline">Sabit gelir ve giderler</span>
         </Button>
     )}>
     <div className="mx-auto w-full min-w-0 max-w-5xl space-y-6 p-4 md:p-6" style={selecting ? { paddingBottom: "calc(9rem + env(safe-area-inset-bottom))" } : undefined}>
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0"><BudgetDateField heading="Bütçe" label="Bütçe ayı" value={month} monthOnly onChange={goToMonth} /><p className="mt-1 text-sm text-muted-foreground">{periodBounds ? `${formatDate(periodBounds.min)} – ${formatDate(periodBounds.max)}` : "Aylık gelir, gider ve işlem hareketlerin."}</p></div>
-        <div className="flex flex-wrap gap-2">
-          {!readOnly && <Button disabled={!hydrated || saving || Boolean(initial.error)} variant="outline" className="rounded-full" onClick={() => openEntry(true)}><Plus className="size-4" />Sabit işlem ekle</Button>}
-        </div>
+      <header className="flex min-w-0 items-center justify-between gap-2">
+        <div className="min-w-0 flex-1"><BudgetDateField heading="Bütçe" label="Bütçe ayı" value={month} monthOnly onChange={goToMonth} /></div>
+        {!readOnly && <Button aria-label="Sabit işlem ekle" disabled={!hydrated || saving || Boolean(initial.error)} variant="outline" className="h-9 shrink-0 gap-1.5 rounded-full px-3 text-xs sm:text-sm" onClick={() => openEntry(true)}><Plus className="size-4" aria-hidden /><span>Sabit işlem<span className="hidden sm:inline"> ekle</span></span></Button>}
       </header>
 
       {initial.error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/20 p-4"><p className="text-sm text-destructive">{initial.error}</p><Button variant="outline" className="rounded-full" onClick={() => window.location.reload()}>Tekrar dene</Button></div>}

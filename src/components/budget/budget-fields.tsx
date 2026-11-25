@@ -28,9 +28,9 @@ export function BudgetDateField({ label, value, onChange, monthOnly = false, hea
   const display = value ? new Intl.DateTimeFormat("tr-TR", { ...(monthOnly ? {} : { day: "numeric" as const }), month: "long", year: "numeric" }).format(new Date(`${value}${monthOnly ? "-01" : ""}T12:00:00`)) : optional ? "Bitiş yok" : "Seç"
   const trigger = (
     <button type="button" aria-label={`${label}: ${display}`} aria-haspopup="dialog" aria-expanded={open}
-      className={heading ? "-ml-3 inline-flex items-center gap-2 rounded-xl px-3 py-1 text-xl font-bold tracking-tight outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring sm:text-2xl" : fieldClass}
+      className={heading ? "-ml-2 inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-xl px-2 py-1 text-lg font-bold tracking-tight outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring sm:text-2xl" : fieldClass}
       onClick={() => { setView((value || todayLocal()).slice(0, 7)); setChoosingMonth(monthOnly); setOpen(true) }}>
-      {heading ? <>{heading} {value && months[Number(value.slice(5, 7)) - 1]}<ChevronDown aria-hidden className="size-4 text-muted-foreground" /></> : <><span className="min-w-0 break-words">{display}</span><CalendarDays className="size-4 shrink-0 text-muted-foreground" /></>}
+      {heading ? <><span className="truncate">{heading} {value && months[Number(value.slice(5, 7)) - 1]}</span><ChevronDown aria-hidden className="size-4 shrink-0 text-muted-foreground" /></> : <><span className="min-w-0 break-words">{display}</span><CalendarDays className="size-4 shrink-0 text-muted-foreground" /></>}
     </button>
   )
   return (
