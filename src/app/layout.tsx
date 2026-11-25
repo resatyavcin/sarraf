@@ -1,66 +1,24 @@
-import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
-import { ServiceWorkerRegistrar } from "@/components/sw-registrar";
+import type { Metadata } from "next";
+import localFont from "next/font/local";
+import { ThemeProvider } from "@/components/providers/theme-provider";
+import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
-
-const geistSans = Plus_Jakarta_Sans({
+const font = localFont({
+  src: "../../public/fonts/plus-jakarta-sans.ttf",
   variable: "--font-jakarta",
-  subsets: ["latin", "latin-ext"],
+  display: "swap",
 });
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
   title: "Sarraf",
-  description: "Altın, Dolar ve Euro kurlarını canlı takip edin",
-  manifest: "/manifest.json",
-  icons: {
-    icon: "/icons/icon-192.png",
-    apple: "/icons/icon-192.png",
-  },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "Sarraf",
-  },
+  description: "Kişisel bütçe yönetimi",
 };
-
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  viewportFit: "cover",
-  interactiveWidget: "resizes-content",
-  colorScheme: "light",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f7f8fc" },
-    { media: "(prefers-color-scheme: dark)", color: "#f7f8fc" },
-  ],
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="tr">
-      <head>
-        <link
-          rel="icon"
-          href="/icons/icon-192.png"
-          sizes="192x192"
-          type="image/png"
-        />
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-      </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-        <ServiceWorkerRegistrar />
+    <html lang="tr" suppressHydrationWarning className={font.variable}>
+      <body>
+        <ThemeProvider defaultTheme="light" storageKey="sarraf-theme">
+          <ToastProvider>{children}</ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

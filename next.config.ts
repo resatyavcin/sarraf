@@ -1,16 +1,3 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  reactCompiler: true,
-  headers: async () => [
-    {
-      source: "/sw.js",
-      headers: [
-        { key: "Cache-Control", value: "no-cache" },
-        { key: "Service-Worker-Allowed", value: "/" },
-      ],
-    },
-  ],
-};
-
-export default nextConfig;
+import type { NextConfig } from "next"
+const config: NextConfig = { reactCompiler: true }
+export default config

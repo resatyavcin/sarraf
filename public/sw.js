@@ -1,56 +1,14 @@
-const CACHE_NAME = "sarraf-v5";
-
-const STATIC_ASSETS = ["/", "/manifest.json"];
-
+// Retire the previous app's service worker so installed copies stop serving
+// cached pages from the old implementation after the replacement is deployed.
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  );
-  self.skipWaiting();
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((k) => k.startsWith("sarraf-") && k !== CACHE_NAME)
-          .map((k) => caches.delete(k))
-      )
-    )
-  );
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const names = await caches.keys();
+    await Promise.all(names.filter((name) => name.startsWith("sarraf-")).map((name) => caches.delete(name)));
+    await self.clients.claim();
+    await self.registration.unregister();
+  })());
 });
-
-self.addEventListener("fetch", (event) => {
-  const url = new URL(event.request.url);
-
-  if (url.origin !== self.location.origin) {
-    return;
-  }
-
-  // Never cache API responses, including future endpoints.
-  if (url.pathname === "/api" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/auth/")) {
-    return;
-  }
-
-  if (event.request.method === "GET") {
-    event.respondWith(staleWhileRevalidate(event.request));
-  }
-});
-
-async function staleWhileRevalidate(request) {
-  const cache = await caches.open(CACHE_NAME);
-  const cached = await cache.match(request);
-
-  const fetchPromise = fetch(request)
-    .then((response) => {
-      if (response.ok) {
-        cache.put(request, response.clone());
-      }
-      return response;
-    })
-    .catch(() => cached);
-
-  return cached || fetchPromise;
-}
